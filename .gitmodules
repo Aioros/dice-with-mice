@@ -1,0 +1,3 @@
+[submodule "lib/foundryvtt-dice-so-nice"]
+	path = lib/foundryvtt-dice-so-nice
+	url = https://gitlab.com/riccisi/foundryvtt-dice-so-nice.git
