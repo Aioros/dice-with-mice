@@ -1,0 +1,32 @@
+{
+    "id": "dice-thrower",
+    "title": "Dice Thrower",
+    "description": "Dice Thrower",
+    "version": "0.1.0",
+    "compatibility": {
+        "minimum": "12.331",
+        "verified": "13.337"
+    },
+    "authors": [
+        {
+            "name": "Aioros",
+            "email": "aioros83@gmail.com",
+            "discord": "MrAioros"
+        }
+    ],
+    "relationships": {
+        "requires": [
+            {
+                "id": "dice-so-nice",
+                "type": "module"
+            }
+        ]
+    },
+    "esmodules": [
+        "./scripts/dice-thrower.js"
+    ],
+    "socket": true,
+    "url": "",
+    "manifest": "",
+    "download": ""
+}
