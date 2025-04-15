@@ -1,12 +1,36 @@
 import { World, Material, NaiveBroadphase, ContactMaterial, Body, Plane, Vec3, Sphere, PointToPointConstraint, Cylinder, ConvexPolyhedron } from "../lib/cannon-es.0.20.0.min.js";
+import { DICE_SHAPE } from "../lib/foundryvtt-dice-so-nice/module/DiceModels.js";
 import { Vector3 } from "../../dice-so-nice/libs/three.module.min.js";
+
+const RegisterPromise = {
+    TransferableResponse: function(data, transferable) {
+        this.data = data;
+        this.transferable = transferable;
+    }
+}
 
 class PhysicsWorkerController {
     constructor() {
         this.worker = self;
         this.actionHandlerMap = {};
         this.worker.onmessage = this.onmessage.bind(this);
-        this.Vector3 = Vector3;
+        this.shapeList = new Map();
+    }
+
+    async onmessage(e) {
+        const { id, actionType, payload } = e.data;
+        let result;
+        if (this.api[actionType]) {
+            result = await this.api[actionType].call(this, payload);
+        } else {
+            result = { msg: "Request not valid" };
+        }
+        
+        if (result instanceof RegisterPromise.TransferableResponse) {
+            self.postMessage({ id, response: result.data }, result.transferable);
+        } else {
+            self.postMessage({ id, response: result });
+        }
     }
 
     get api() {
@@ -23,16 +47,14 @@ class PhysicsWorkerController {
             playStep: this.playStep,
             simulateThrow: this.simulateThrow,
             getWorldInfo: this.getWorldInfo,
-
-        
-            print(payload) {
+            /*print(payload) {
                 console.log(payload.msg);
                 return { msg: "msg has been print." };
             },
             async asyncCalc(payload) {
                 const result = await new Promise((resolve) => setTimeout(() => resolve(payload.params * 2), 1000));
                 return { msg: `the caculated answer is ${result}.` };
-            }
+            }*/
         }
     }
 
@@ -522,18 +544,6 @@ class PhysicsWorkerController {
             console.log(`constraint ${i}:`);
             console.log(this.world.constraints[i]);
         }
-    }
-
-    async onmessage(e) {
-        const { id, actionType, payload } = e.data;
-        let result;
-        if (this.api[actionType]) {
-            result = await this.api[actionType].call(this, payload);
-        } else {
-            result = { msg: "Request not valid" };
-        }
-        
-        self.postMessage({ id, response: result });
     }
 
 }

@@ -2,10 +2,6 @@ import { PhysicsWorkerWithPromise } from "./PhysicsWorkerWithPromise.js";
 
 const METHOD = "dsnThrower";
 
-Hooks.on("diceSoNiceMessageProcessed", (chatMessageId, interception) => {
-    interception.willTrigger3DRoll = false;
-});
-
 Hooks.on("init", () => {
     CONFIG.Dice.fulfillment.methods[METHOD] = {
         icon: "<i class=\"fa-solid fa-play\"></i>",
@@ -15,23 +11,28 @@ Hooks.on("init", () => {
     };
 });
 
+Hooks.on("diceSoNiceReady", (dice3d) => {
+    dice3d.box.physicsWorker.terminate();
+    dice3d.box.physicsWorker = DSNThrower._physicsWorker;
+    dice3d.DiceFactory.physicsWorker.terminate();
+    dice3d.DiceFactory.physicsWorker = DSNThrower._physicsWorker;
+    DSNThrower._physicsWorker.exec("init", {
+        muteSoundSecretRolls: dice3d.box.muteSoundSecretRolls,
+        height: dice3d.box.display.containerHeight,
+        width: dice3d.box.display.containerWidth
+    });
+});
+
+Hooks.on("diceSoNiceMessageProcessed", (chatMessageId, interception) => {
+    interception.willTrigger3DRoll = false;
+});
+
 class DSNThrower extends foundry.applications.dice.RollResolver {
 
     static _physicsWorker;
     static {
         this._physicsWorker = new PhysicsWorkerWithPromise({workerUrl: new URL("PhysicsWorker.js", import.meta.url), workerName: "PhysicsWorker"});
         console.log(this._physicsWorker);
-        //await this._physicsWorker.postMessage({actionType: "init", payload: {
-        //    muteSoundSecretRolls: false,
-        //    height: 600,
-        //    width: 800,
-        //}});
-        this._physicsWorker.exec("init", {
-            muteSoundSecretRolls: false,
-            height: 600,
-            width: 800,
-        });
-
     }
 
     static DEFAULT_OPTIONS = {
@@ -65,14 +66,6 @@ class DSNThrower extends foundry.applications.dice.RollResolver {
         const originalPromise = super.awaitFulfillment();
 
         console.log(this);
-
-        
-        this.physicsWorker
-            .postMessage({
-                actionType: "asyncCalc",
-                payload: { msg: "send messages to worker", params: 1 },
-            })
-            .then((response) => console.log("message received from worker: ", response.msg));
 
         // temporarily here
         //const throwFormula = this.throwable.map(t => t.term.formula).join(" + ");
