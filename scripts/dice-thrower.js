@@ -1,4 +1,6 @@
 import { PhysicsWorkerWithPromise } from "./PhysicsWorkerWithPromise.js";
+import { DiceNotation } from "../lib/foundryvtt-dice-so-nice/module/DiceNotation.js";
+import { methods } from "./methods.js";
 
 const METHOD = "dsnThrower";
 
@@ -12,18 +14,36 @@ Hooks.on("init", () => {
 });
 
 Hooks.on("diceSoNiceReady", (dice3d) => {
+    // Needed by the rescoped showForRoll below
+    //const Dice3D = dice3d.constructor;
+
+    // Replace the PhysicsWorker with our own
     dice3d.box.physicsWorker.terminate();
     dice3d.box.physicsWorker = DSNThrower._physicsWorker;
     dice3d.DiceFactory.physicsWorker.terminate();
     dice3d.DiceFactory.physicsWorker = DSNThrower._physicsWorker;
-    DSNThrower._physicsWorker.exec("init", {
-        muteSoundSecretRolls: dice3d.box.muteSoundSecretRolls,
-        height: dice3d.box.display.containerHeight,
-        width: dice3d.box.display.containerWidth
-    });
+    dice3d.box.initialize();
+
+    //dice3d.box.swapDiceFace = () => {};
+
+    // Embarassing magic trick. We recreate the showForRoll function to make it use our own DiceNotation class
+    //let f;
+    //dice3d.showForRoll = eval("f = function " + dice3d.showForRoll.toString()).bind(dice3d);
+
+    dice3d.preRoll = methods.dice3d.preRoll.bind(dice3d);
+    dice3d.box.preThrow = methods.diceBox.preThrow.bind(dice3d.box);
+    dice3d.box.getPreThrowVectors = methods.diceBox.getPreThrowVectors.bind(dice3d.box);
+
+    // Add the term id to the options so I can find it later in the diceList
+    const originalDiceNotationAddDie = DiceNotation.prototype.addDie;
+    DiceNotation.prototype.addDie = function({fvttDie, index, isd10of100 = false, options = {}}) {
+        fvttDie.options._originalId = fvttDie._id;
+        return originalDiceNotationAddDie.call(this, {fvttDie, index, isd10of100, options});
+    };
 });
 
 Hooks.on("diceSoNiceMessageProcessed", (chatMessageId, interception) => {
+    // Prevent DSN interception of chat messages entirely
     interception.willTrigger3DRoll = false;
 });
 
@@ -32,7 +52,11 @@ class DSNThrower extends foundry.applications.dice.RollResolver {
     static _physicsWorker;
     static {
         this._physicsWorker = new PhysicsWorkerWithPromise({workerUrl: new URL("PhysicsWorker.js", import.meta.url), workerName: "PhysicsWorker"});
-        console.log(this._physicsWorker);
+    }
+
+    static DSNTHROWER_STATES = {
+        INACTIVE: 0,
+        PREROLL: 1,
     }
 
     static DEFAULT_OPTIONS = {
@@ -44,7 +68,8 @@ class DSNThrower extends foundry.applications.dice.RollResolver {
         },
         position: {
             width: 500,
-            height: "auto"
+            height: "auto",
+            top: 3000
         },
         /*form: {
             submitOnChange: false,
@@ -52,6 +77,8 @@ class DSNThrower extends foundry.applications.dice.RollResolver {
             handler: this._fulfillRoll
         }*/
     };
+
+    #throwerState;
 
     get physicsWorker() {
         return this.constructor._physicsWorker;
@@ -62,123 +89,60 @@ class DSNThrower extends foundry.applications.dice.RollResolver {
     }
 
     async awaitFulfillment() {
-        console.log("awaitFulfillment");
+        this.#throwerState = DSNThrower.DSNTHROWER_STATES.INACTIVE;
+
         const originalPromise = super.awaitFulfillment();
 
-        console.log(this);
-
-        // temporarily here
-        //const throwFormula = this.throwable.map(t => t.term.formula).join(" + ");
-        //const tempRoll = new CONFIG.Dice.rolls[0](throwFormula);
-        //const tempRoll = CONFIG.Dice.rolls[0].fromTerms(this.throwable.map(t => t.term));
+        const resolver = this;
 
         if (this.throwable.length) {
             const plus = new foundry.dice.terms.OperatorTerm({ operator: "+" });
             const dice = this.throwable.map(t => t.term);
             let termList = dice.map((e, i) => i < dice.length - 1 ? [e, plus] : [e]).reduce((a, b) => a.concat(b));
-            const tempRoll = CONFIG.Dice.rolls[0].fromTerms(termList);
+            const preRoll = CONFIG.Dice.rolls[0].fromTerms(termList);
 
-            // this actually duplicates the results
-            const ast = CONFIG.Dice.parser.toAST(tempRoll.terms);
-            const resultTemp = await tempRoll._evaluateASTAsync(ast);
-            game.dice3d.showForRoll(tempRoll).then(() => {
-                tempRoll.dice.forEach(die => {
-                    die.results.forEach((result, i) => {
-                        [...this.element.querySelectorAll(`[name="${die._id}"]`)][i].value = result.result;
+            // ugly trick while I figure stuff out
+            // evaluate the roll "manually" just so I can feed it to the fake DSN throw, clear the evaluated roll so it's "reevaluated" correctly with the inputs on submit.
+            // I KNOW. The problem is DiceNotation loops through the `results`. Might review later.
+            const ast = CONFIG.Dice.parser.toAST(preRoll.terms);
+            const resultTemp = await preRoll._evaluateASTAsync(ast);
+
+            // Fake roll just to put the dice down.
+            this.#throwerState = DSNThrower.DSNTHROWER_STATES.PREROLL;
+            game.dice3d.preRoll(preRoll);
+
+            DSNThrower._physicsWorker.off("worldAsleep");
+            DSNThrower._physicsWorker.on("worldAsleep", async () => {
+                if (this.#throwerState === DSNThrower.DSNTHROWER_STATES.PREROLL) {
+                    //console.log("Manual throw done");
+                    this.#throwerState = DSNThrower.DSNTHROWER_STATES.INACTIVE; // this disables additional manual throws
+                    [...resolver.element.querySelectorAll(`input`)].forEach(i => {
+                        i.value = "";
                     });
-                });
+                    for (const die of game.dice3d.box.diceList) {
+                        const physicsValue = await DSNThrower._physicsWorker.exec("getDiceCurrentValue", die.id);
+                        [...resolver.element.querySelectorAll(`input[name="${die.options._originalId}"]`)].find(i => i.value === "").value = physicsValue;
+                    }
+                }
+            });
+
+            dice.forEach(die => {
+                die.results = [];
+                die._evaluated = false;
             });
         }
 
         return originalPromise;
     }
 
-    async addTerm(term) {
-        console.log("addTerm", term);
-        return super.addTerm(term);
+    async close(options={}) {
+        DSNThrower._physicsWorker.off("worldAsleep");
+        return super.close(options);
     }
 
-    async resolveResult(term, method, { reroll=false, explode=false }={}) {
-        console.log("resolveResult", term, method, reroll, explode);
-        return super.resolveResult(term, method, { reroll, explode });
+    async _onSubmitForm(formConfig, event) {
+        DSNThrower._physicsWorker.off("worldAsleep");
+        return super._onSubmitForm(formConfig, event);
     }
-
-    registerResult(method, denomination, result) {
-        console.log("registerResult", method, denomination, result);
-        return super.addTerm(method, denomination, result);
-    }
-
-    /*
-    #resolve;
-
-    constructor(roll, options = {}) {
-        console.log(roll, options);
-        super(roll, options);
-        this.init();
-    }
-
-    init() {
-        console.log("init");
-        document.body.addEventListener("click", (evt) => {
-            this.#resolve?.();
-        });
-    }
-
-    async awaitFulfillment() {
-        console.log("awaitFulfillment");
-        return new Promise(resolve => this.#resolve = resolve);
-    }
-
-    async addTerm(term) {
-        console.log("addTerm", term);
-        if ( !(term instanceof foundry.dice.terms.DiceTerm) ) {
-            throw new Error("Only DiceTerm instances may be added to the RollResolver.");
-        }
-        return new Promise(resolve => this.#resolve = resolve);
-    }
-
-    async resolveResult(term, method, { reroll=false, explode=false }={}) {
-        console.log("resolveResult", term, method, reroll, explode);
-        return;
-
-        const group = this.element.querySelector(`fieldset[data-term-id="${term._id}"]`);
-        if ( !group ) {
-            console.warn("Attempted to resolve a single result for an unregistered DiceTerm.");
-            return;
-        }
-        const fields = document.createElement("div");
-        fields.classList.add("form-fields");
-        fields.innerHTML = `
-            <label class="icon die-input new-addition" data-denomination="${term.denomination}" data-method="${method}">
-                <input type="number" min="1" max="${term.faces}" step="1" name="${term._id}"
-                    ${method === "manual" ? "" : "readonly"} placeholder="${game.i18n.localize(term.denomination)}">
-                ${reroll ? '<i class="fas fa-arrow-rotate-right"></i>' : ""}
-                ${explode ? '<i class="fas fa-burst"></i>' : ""}
-                ${CONFIG.Dice.fulfillment.dice[term.denomination]?.icon ?? ""}
-            </label>
-            <button type="button" class="submit-result" data-tooltip="DICE.SubmitRoll"
-                    aria-label="${game.i18n.localize("DICE.SubmitRoll")}">
-                <i class="fas fa-arrow-right"></i>
-            </button>
-        `;
-        group.appendChild(fields);
-        this.setPosition({ height: "auto" });
-        return new Promise(resolve => {
-            const button = fields.querySelector("button");
-            const input = fields.querySelector("input");
-            button.addEventListener("click", () => {
-                if ( !input.validity.valid ) {
-                    input.form.reportValidity();
-                    return;
-                }
-                let value = input.valueAsNumber;
-                if ( !value ) value = term.randomFace();
-                input.value = `${value}`;
-                input.disabled = true;
-                button.remove();
-                resolve(value);
-            });
-        });
-    }*/
 
 }

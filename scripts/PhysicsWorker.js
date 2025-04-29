@@ -2,6 +2,7 @@ import { World, Material, NaiveBroadphase, ContactMaterial, Body, Plane, Vec3, S
 import { DICE_SHAPE } from "../lib/foundryvtt-dice-so-nice/module/DiceModels.js";
 import { Vector3 } from "../../dice-so-nice/libs/three.module.min.js";
 
+// This is just to keep the same interface as webworker-promise and leave original code inside methods intact. Similar for host.emit().
 const RegisterPromise = {
     TransferableResponse: function(data, transferable) {
         this.data = data;
@@ -12,9 +13,14 @@ const RegisterPromise = {
 class PhysicsWorkerController {
     constructor() {
         this.worker = self;
-        this.actionHandlerMap = {};
         this.worker.onmessage = this.onmessage.bind(this);
         this.shapeList = new Map();
+        this.host = {
+            emit: (eventType, payload) => {
+                self.postMessage({ id: eventType, payload });
+            }
+        }
+        this.lastCheckedWorldAsleep = false;
     }
 
     async onmessage(e) {
@@ -27,9 +33,9 @@ class PhysicsWorkerController {
         }
         
         if (result instanceof RegisterPromise.TransferableResponse) {
-            self.postMessage({ id, response: result.data }, result.transferable);
+            self.postMessage({ id, payload: result.data }, result.transferable);
         } else {
-            self.postMessage({ id, response: result });
+            self.postMessage({ id, payload: result });
         }
     }
 
@@ -41,20 +47,13 @@ class PhysicsWorkerController {
             updateConstraint: this.updateConstraint,
             createShape: this.createShape,
             getDiceValue: this.getDiceValue,
+            getDiceCurrentValue: this.getDiceCurrentValue,
             createDice: this.createDice,
             removeDice: this.removeDice,
             addDice: this.addDice,
             playStep: this.playStep,
             simulateThrow: this.simulateThrow,
             getWorldInfo: this.getWorldInfo,
-            /*print(payload) {
-                console.log(payload.msg);
-                return { msg: "msg has been print." };
-            },
-            async asyncCalc(payload) {
-                const result = await new Promise((resolve) => setTimeout(() => resolve(payload.params * 2), 1000));
-                return { msg: `the caculated answer is ${result}.` };
-            }*/
         }
     }
 
@@ -70,7 +69,7 @@ class PhysicsWorkerController {
         this.soundDelay = 2; // time between sound effects in worldstep
         this.animstate = 'throw';
 
-        this.mouseConstraint = null;
+        this.mouseConstraints = [];
 
         this.diceList = new Map();
 
@@ -86,6 +85,8 @@ class PhysicsWorkerController {
         this.addBarriers(data.height, data.width);
         this.addJointBody();
         this.reset();
+
+        this.framerate = 1/60; // needed by playStep, normally set up by the simulateThrow process
     }
 
     /**
@@ -308,24 +309,25 @@ class PhysicsWorkerController {
 
         // Create a new constraint
         // The pivot for the jointBody is zero
-        this.mouseConstraint = new PointToPointConstraint(dice, pivot, this.jointBody, new Vec3(0, 0, 0));
+        const newConstraint = new PointToPointConstraint(dice, pivot, this.jointBody, new Vec3(0, 0, 0), Number.MAX_SAFE_INTEGER);//10000000);
+        this.mouseConstraints.push(newConstraint);
 
-        // Add the constriant to world
-        this.world.addConstraint(this.mouseConstraint);
+        // Add the constraint to world
+        this.world.addConstraint(newConstraint);
     }
 
     updateConstraint(pos){
-        if (this.mouseConstraint) {
+        this.mouseConstraints.forEach(constraint => {
             this.jointBody.position.set(pos.x, pos.y, pos.z + 150);
-            this.mouseConstraint.update();
-        }
+            constraint.update();
+        });
     }
 
     removeConstraint(){
-        if (this.mouseConstraint) {
-            this.world.removeConstraint(this.mouseConstraint);
-            this.mouseConstraint = null;
-        }
+        this.mouseConstraints.forEach(constraint => {
+            this.world.removeConstraint(constraint);
+        });
+        this.mouseConstraints = [];
     }
 
     createShape({type, radius}){
@@ -367,14 +369,7 @@ class PhysicsWorkerController {
         return this.loadShape(vectors, faces, radius, skipLastFaceIndex);
     }
 
-    getDiceValue(id){
-        const dice = this.diceList.get(id);
-
-        if(!dice)
-            return null;
-        if(dice.result)
-            return dice.result;
-
+    getValueOfClosestFace(dice) {
         const vector = new Vector3(0, 0, dice.diceShape == 'd4' ? -1 : 1);
         const faceCannon = new Vector3();
         let closest_face, closest_angle = Math.PI * 2;
@@ -390,11 +385,36 @@ class PhysicsWorkerController {
             }
         }
         const dieValue = DICE_SHAPE[dice.diceShape].faceValues[closest_face];
+        return dieValue;
+    }
+
+    getDiceValue(id){
+        const dice = this.diceList.get(id);
+
+        if(!dice)
+            return null;
+        if(dice.result)
+            return dice.result;
+        
+        const dieValue = this.getValueOfClosestFace(dice);
         dice.result = dieValue;
         this.diceList.set(id, dice);
 
         return dieValue;
     }
+
+    /* Added */
+    getDiceCurrentValue(id){
+        const dice = this.diceList.get(id);
+
+        if(!dice)
+            return null;
+
+        const dieValue = this.getValueOfClosestFace(dice);
+
+        return dieValue;
+    }
+
 
     reset(){
         this.lastSoundType = '';
@@ -402,8 +422,9 @@ class PhysicsWorkerController {
         this.lastSound = 0;
         this.detectedCollides = new Array(1000);
         this.iterationsNeeded = 0;
-        this.animstate = 'simulate';
+        this.animstate = "throw";//'simulate';
         this.iteration = 0;
+        this.lastCheckedWorldAsleep = false;
     }
 
     simulateThrow({minIterations, nbIterationsBetweenRolls, framerate, canBeFlipped}) {
@@ -499,6 +520,7 @@ class PhysicsWorkerController {
                 this.diceList.set(id, dice);
             }
         }
+
         return stopped;
     }
 
@@ -526,6 +548,10 @@ class PhysicsWorkerController {
                 }
             }
         }
+        if (this.lastCheckedWorldAsleep === false && worldAsleep) {
+            this.host.emit("worldAsleep");
+        }
+        this.lastCheckedWorldAsleep = worldAsleep;
         return new RegisterPromise.TransferableResponse({ids: ids, quaternionsBuffers: quaternions.buffer, positionsBuffers: positions.buffer, worldAsleep: worldAsleep}, [quaternions.buffer, positions.buffer]);
     }
 
