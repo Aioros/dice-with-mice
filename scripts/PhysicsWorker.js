@@ -42,12 +42,12 @@ class PhysicsWorkerController {
     get api() {
         return {
             init: this.init,
+            allowSleeping: this.allowSleeping,
             addConstraint: this.addConstraint,
             removeConstraint: this.removeConstraint,
             updateConstraint: this.updateConstraint,
             createShape: this.createShape,
             getDiceValue: this.getDiceValue,
-            getDiceCurrentValue: this.getDiceCurrentValue,
             createDice: this.createDice,
             removeDice: this.removeDice,
             addDice: this.addDice,
@@ -87,6 +87,10 @@ class PhysicsWorkerController {
         this.reset();
 
         this.framerate = 1/60; // needed by playStep, normally set up by the simulateThrow process
+    }
+
+    allowSleeping({allow = true}) {
+        this.world.allowSleep = allow;
     }
 
     /**
@@ -369,7 +373,14 @@ class PhysicsWorkerController {
         return this.loadShape(vectors, faces, radius, skipLastFaceIndex);
     }
 
-    getValueOfClosestFace(dice) {
+    getDiceValue(id){
+        const dice = this.diceList.get(id);
+
+        if(!dice)
+            return null;
+        if(dice.result)
+            return dice.result;
+
         const vector = new Vector3(0, 0, dice.diceShape == 'd4' ? -1 : 1);
         const faceCannon = new Vector3();
         let closest_face, closest_angle = Math.PI * 2;
@@ -385,36 +396,11 @@ class PhysicsWorkerController {
             }
         }
         const dieValue = DICE_SHAPE[dice.diceShape].faceValues[closest_face];
-        return dieValue;
-    }
-
-    getDiceValue(id){
-        const dice = this.diceList.get(id);
-
-        if(!dice)
-            return null;
-        if(dice.result)
-            return dice.result;
-        
-        const dieValue = this.getValueOfClosestFace(dice);
         dice.result = dieValue;
         this.diceList.set(id, dice);
 
         return dieValue;
     }
-
-    /* Added */
-    getDiceCurrentValue(id){
-        const dice = this.diceList.get(id);
-
-        if(!dice)
-            return null;
-
-        const dieValue = this.getValueOfClosestFace(dice);
-
-        return dieValue;
-    }
-
 
     reset(){
         this.lastSoundType = '';
@@ -520,7 +506,6 @@ class PhysicsWorkerController {
                 this.diceList.set(id, dice);
             }
         }
-
         return stopped;
     }
 
@@ -571,6 +556,5 @@ class PhysicsWorkerController {
             console.log(this.world.constraints[i]);
         }
     }
-
 }
 self.physicsWorkerController = new PhysicsWorkerController();
