@@ -1,6 +1,22 @@
 import { PhysicsWorkerWithPromise } from "./PhysicsWorkerWithPromise.js";
+import { deepProxy } from "./utils.js";
 
 export class DSNThrower extends foundry.applications.dice.RollResolver {
+
+    constructor(roll, options={}) {
+        super(roll, options);
+        
+        // Proxy the results arrays to identify which one is being rerolled
+        roll.dice.forEach(die => {
+            die.results = deepProxy(die.results, (change) => {
+                if (change.action === "set" && change.path.endsWith(".rerolled") && !change.previousValue && change.newValue) {
+                    die.results.forEach((result, i) => {
+                        result.lastRerolled = (parseInt(change.path.split(".")[0]) === i);
+                    });
+                }
+            });
+        });
+    }
 
     static _physicsWorker;
     static {
@@ -31,11 +47,11 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
             height: "auto",
             top: 3000
         },
-        /*form: {
+        form: {
             submitOnChange: false,
             closeOnSubmit: false,
             handler: this._fulfillRoll
-        }*/
+        },
         actions: {
             spawnDice: DSNThrower.spawnDiceAction
         }
@@ -84,23 +100,21 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
         //await this.render();
     }
 
-    async spawnDice() {
+    async spawnDice(term) {
         const resolver = this;
 
         game.dice3d.box.currentResolver = resolver;
 
         if (this.throwable.length) {
-            const plus = new foundry.dice.terms.OperatorTerm({ operator: "+" });
-            const dice = this.throwable.map(t => t.term);
-            let termList = dice.map((e, i) => i < dice.length - 1 ? [e, plus] : [e]).reduce((a, b) => a.concat(b));
-            
-            const preRoll = CONFIG.Dice.rolls[0].fromTerms(termList);
+            const dice = term ? [term] : this.throwable.map(t => t.term);
+            const preRoll = {dice};
 
             // Place the dice under the mouse
             await this.setThrowerState(DSNThrower.DSNTHROWER_STATES.READY);
             // Prevent the physics world from sleeping until the dice is actually thrown
             await DSNThrower._physicsWorker.exec("allowSleeping", {allow: false});
 
+            game.dice3d.activateListeners();
             game.dice3d.preRoll(preRoll);
 
             DSNThrower._physicsWorker.off("worldAsleep");
@@ -108,34 +122,28 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
                 if (this.throwerState === DSNThrower.DSNTHROWER_STATES.ROLLING) {
                     //console.log("Manual throw done");
                     await this.setThrowerState(DSNThrower.DSNTHROWER_STATES.INACTIVE); // this disables additional manual throws; could think of something like a minimum roll time
+                    game.dice3d.deactivateListeners();
 
-                    for (const die of preRoll.dice) {
-                        // If we're rerolling/exploding, it's always just one die
-                        const diceAmount = die.results.length ? 1 : die.number;
-                        for (let i=0; i<diceAmount; i++) {
-                            const filledInputs = this.getFilledInputs(die._id);//[...resolver.element.querySelectorAll(`input[name="${die._id}"]`)].filter(input => input.value);
-                            const input = [...resolver.element.querySelectorAll(`input[name="${die._id}"]`)][filledInputs.length];
-                            const dsnDice = game.dice3d.box.diceList.filter(d => d.options._originalId === die._id && d.options._index === i);
-                            let result = 0;
-                            for (let dsnDie of dsnDice) {
-                                const originalPhysicsValue = await DSNThrower._physicsWorker.exec("getDiceValue", dsnDie.id);
-                                let multiplier = 1;
-                                if (die.faces === 100) {
-                                    if (originalPhysicsValue === 10) {
-                                        multiplier = 0;
-                                    }
-                                    if (dsnDie.notation.type === "d100") {
-                                        multiplier *= 10;
-                                    }
-                                }
-                                result += multiplier * originalPhysicsValue;
-                            }
-                            input.value = result || 100;
+                    for (const dsnDie of game.dice3d.box.diceList) {
+                        const resultDSNDice = [dsnDie];
+                        const fvttDie = preRoll.dice.find(d => d._id === dsnDie.options._originalId);
+                        dsnDie.result = await DSNThrower._physicsWorker.exec("getDiceValue", dsnDie.id);
+                        if (fvttDie.faces === 100) {
+                            if (dsnDie.notation.type === "d10") continue;
+                            dsnDie.result = dsnDie.result % 10 * 10;
+                            const d10ofd100 = game.dice3d.box.diceList.find(d => d.options._originalId === dsnDie.options._originalId && d.options._index === dsnDie.options._index && d.id !== dsnDie.id);
+                            resultDSNDice.push(d10ofd100);
+                            const d10Value = await DSNThrower._physicsWorker.exec("getDiceValue", d10ofd100.id);
+                            dsnDie.result += d10Value % 10;
                         }
+                        this.registerDSNResult(DSNThrower.METHOD, resultDSNDice);
                     }
 
                     // Autosubmit if all done
-                    this._checkDone();
+                    setTimeout(() => {
+                        //console.log(game.dice3d.box.diceList);
+                        //this._checkDone();
+                    }, 2000); // this timer should be a setting
                 }
             });
 
@@ -154,6 +162,18 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
         return originalPromise;
     }
 
+    registerDSNResult(method, dsnDice) {
+        const dsnDie = dsnDice[0];
+        const query = `label[data-denomination="${dsnDie.notation.type}"][data-method="${method}"] > input:not(:disabled)`;
+        const input = Array.from(this.element.querySelectorAll(query)).find(input => input.value === "");
+        input.value = `${dsnDie.result}`;
+        input.dataset.dsnDiceId = JSON.stringify(dsnDice.map(d => d.id));
+        //const submitInput = input.closest(".form-fields")?.querySelector("button");
+        //if ( submitInput ) submitInput.dispatchEvent(new MouseEvent("click"));
+        //else this._checkDone();
+        return true;
+    }
+
     async close(options={}) {
         DSNThrower._physicsWorker.off("worldAsleep");
         return super.close(options);
@@ -165,8 +185,29 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
     }
 
     async resolveResult(term, method, { reroll=false, explode=false }={}) {
-        this.spawnDice();
+        this.element.querySelectorAll(`input[name="${term._id}"]:disabled`).forEach((input, i) => {
+            term.results[i].dsnDiceId = JSON.parse(input.dataset.dsnDiceId);
+        });
+        this.spawnDice(term);
         return super.resolveResult(term, method, { reroll, explode });
+    }
+
+    static async _fulfillRoll(event, form, formData) {
+        // Update the DiceTerms with the fulfilled values.
+        for ( let [id, results] of Object.entries(formData.object) ) {
+            const { term } = this.fulfillable.get(id);
+            if ( !Array.isArray(results) ) results = [results];
+            if (form) {
+                results.forEach((result, i) => {
+                    const input = form.querySelectorAll(`input[name="${id}"]`)[i];
+                    const roll = { result: undefined, active: true, dsnDiceId: JSON.parse(input.dataset.dsnDiceId)};
+                    // A null value indicates the user wishes to skip external fulfillment and fall back to the digital roll.
+                    if ( result === null ) roll.result = term.randomFace();
+                    else roll.result = result;
+                    term.results.push(roll);
+                });
+            }
+        }
     }
 
 }

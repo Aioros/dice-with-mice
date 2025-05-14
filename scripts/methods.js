@@ -1,15 +1,70 @@
-//import { DiceNotation } from "../lib/foundryvtt-dice-so-nice/module/DiceNotation.js";
-import { DiceNotation } from "./DiceNotation.js";
+import { DiceNotation as CustomDiceNotation } from "./DiceNotation.js";
+import { DiceNotation } from "../lib/foundryvtt-dice-so-nice/module/DiceNotation.js";
 
 const methods = {
     dice3d: {
+        activateListeners() {
+            // Add some necessary listeners if not already there because of a DSN setting
+            if (!game.settings.get("dice-so-nice", "allowInteractivity")) {
+                const mouseNDC = (event) => {
+                    let rect = this.canvas[0].getBoundingClientRect();
+                    let x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                    if (x > 1)
+                        x = 1;
+                    let y = - ((event.clientY - rect.top) / rect.height) * 2 + 1;
+                    return { x: x, y: y };
+                };
+                $(document).off(".dicesonice");
+                $(document).on("mousemove.dicesonice", "body", async (event) => {
+                    await this.box.onMouseMove(event, mouseNDC(event));
+                });
+                $(document).on("mousedown.dicesonice", "body", async (event) => {
+                    await this.box.onMouseDown(event, mouseNDC(event));
+                    this._beforeShow();
+                });
+                $(document).on("mouseup.dicesonice", "body", async (event) => {
+                    await this.box.onMouseUp(event);
+                    //this._afterShow();
+                });    
+            }
+        },
+
+        deactivateListeners() {
+            if (!game.settings.get("dice-so-nice", "allowInteractivity")) {
+                const hideCanvasAndClear = () => {
+                    const config = game.dice3d.constructor.CONFIG();
+                    if (!config.hideAfterRoll && this.canvas.is(":visible") && !this.box.rolling) {
+                        this.canvas.hide();
+                        this.box.clearAll();
+                    }
+                }
+                $(document).off(".dicesonice");
+                $(document).on("mousedown.dicesonice", "body", async (event) => {
+                    hideCanvasAndClear();
+                });    
+            }
+        },
+
         async preRoll(roll, callback) {
             const Dice3D = this.constructor;
-            const notation = new DiceNotation(roll, Dice3D.ALL_CONFIG(game.user), game.user);
+            const notation = new CustomDiceNotation(roll, Dice3D.ALL_CONFIG(game.user), game.user);
             notation.dsnConfig = Dice3D.ALL_CUSTOMIZATION(game.user, this.DiceFactory);
-
             notation.throws.forEach(t => { t.dsnConfig = notation.dsnConfig; });
 
+            for (const die of roll.dice) {
+                const rerolledDiceId = die.results.find(r => r.lastRerolled)?.dsnDiceId || [];
+                const rerolledDsnDice = [...this.box.diceList, ...this.box.deadDiceList].filter(d => rerolledDiceId.includes(d.id));
+                for (const rerolledDsnDie of rerolledDsnDice) {
+                    //console.log("removing die " + rerolledDsnDie.id + "; result was: " + rerolledDsnDie.result);
+                    this.box.scene.remove(rerolledDsnDie.parent.type === "Scene" ? rerolledDsnDie : rerolledDsnDie.parent);
+                    this.box.diceList = this.box.diceList.filter(d => d.id !== rerolledDsnDie.id);
+                    this.box.deadDiceList = this.box.deadDiceList.filter(d => d.id !== rerolledDsnDie.id);
+                    await this.box.physicsWorker.exec("removeDice", [rerolledDsnDie.id]);
+                }
+            }
+
+            this.box.clearDice();
+            this.box.renderScene();
             this._beforeShow();
             await this.box.preThrow(notation.throws, callback);
         }
@@ -26,7 +81,8 @@ const methods = {
                 await this.currentResolver.setThrowerState(this.currentResolver?.constructor.DSNTHROWER_STATES.ROLLING);
                 await this.physicsWorker.exec("allowSleeping", true);
             }
-            return this.constructor.prototype.onMouseUp.call(this, event);
+            this.constructor.prototype.onMouseUp.call(this, event);
+            return false;
         },
 
         getPreThrowVectors(notationVectors) {
@@ -45,7 +101,8 @@ const methods = {
 
         async preThrow(throws, callback) {
             this.isVisible = true;
-            this.clearDice();
+
+            //this.clearDice();
 
             throws.forEach(notation => {
                 notation = this.getPreThrowVectors(notation);
@@ -85,17 +142,11 @@ const methods = {
 };
 
 export function addMethods(dice3d) {
+    dice3d.activateListeners = methods.dice3d.activateListeners.bind(dice3d);
+    dice3d.deactivateListeners = methods.dice3d.deactivateListeners.bind(dice3d);
     dice3d.preRoll = methods.dice3d.preRoll.bind(dice3d);
     dice3d.box.onMouseDown = methods.diceBox.onMouseDown.bind(dice3d.box);
     dice3d.box.onMouseUp = methods.diceBox.onMouseUp.bind(dice3d.box);
     dice3d.box.preThrow = methods.diceBox.preThrow.bind(dice3d.box);
     dice3d.box.getPreThrowVectors = methods.diceBox.getPreThrowVectors.bind(dice3d.box);
-
-    // Add the term id to the options so I can find it later in the diceList
-    //const originalDiceNotationAddDie = DiceNotation.prototype.addDie;
-    //DiceNotation.prototype.addDie = function({fvttDie, index, isd10of100 = false, options = {}}) {
-    //    fvttDie.options._originalId = fvttDie._id;
-    //    fvttDie.options._index = index;
-    //    return originalDiceNotationAddDie.call(this, {fvttDie, index, isd10of100, options});
-    //};
 }
