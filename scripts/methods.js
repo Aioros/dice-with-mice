@@ -1,5 +1,4 @@
 import { DiceNotation as CustomDiceNotation } from "./DiceNotation.js";
-import { DiceNotation } from "../lib/foundryvtt-dice-so-nice/module/DiceNotation.js";
 
 const methods = {
     dice3d: {
@@ -24,8 +23,7 @@ const methods = {
                 });
                 $(document).on("mouseup.dicesonice", "body", async (event) => {
                     await this.box.onMouseUp(event);
-                    //this._afterShow();
-                });    
+                });
             }
         },
 
@@ -49,23 +47,20 @@ const methods = {
             const Dice3D = this.constructor;
             const notation = new CustomDiceNotation(roll, Dice3D.ALL_CONFIG(game.user), game.user);
             notation.dsnConfig = Dice3D.ALL_CUSTOMIZATION(game.user, this.DiceFactory);
-            notation.throws.forEach(t => { t.dsnConfig = notation.dsnConfig; });
+            notation.throws.forEach(t => {
+                t.dsnConfig = notation.dsnConfig;
+                t.dice.forEach(d => { d.options.dsnConfig = notation.dsnConfig });
+            });
 
             for (const die of roll.dice) {
                 const rerolledDiceId = die.results.find(r => r.lastRerolled)?.dsnDiceId || [];
-                const rerolledDsnDice = [...this.box.diceList, ...this.box.deadDiceList].filter(d => rerolledDiceId.includes(d.id));
-                for (const rerolledDsnDie of rerolledDsnDice) {
-                    //console.log("removing die " + rerolledDsnDie.id + "; result was: " + rerolledDsnDie.result);
-                    this.box.scene.remove(rerolledDsnDie.parent.type === "Scene" ? rerolledDsnDie : rerolledDsnDie.parent);
-                    this.box.diceList = this.box.diceList.filter(d => d.id !== rerolledDsnDie.id);
-                    this.box.deadDiceList = this.box.deadDiceList.filter(d => d.id !== rerolledDsnDie.id);
-                    await this.box.physicsWorker.exec("removeDice", [rerolledDsnDie.id]);
-                }
+                this.box.removeDice(rerolledDiceId);
             }
 
             this.box.clearDice();
             this.box.renderScene();
             this._beforeShow();
+            
             await this.box.preThrow(notation.throws, callback);
         }
     },
@@ -85,6 +80,16 @@ const methods = {
             return false;
         },
 
+        async removeDice(ids) {
+            const removedDsnDice = [...this.diceList, ...this.deadDiceList].filter(d => ids.includes(d.id));
+            for (const removedDsnDie of removedDsnDice) {
+                this.scene.remove(removedDsnDie.parent.type === "Scene" ? removedDsnDie : removedDsnDie.parent);
+                this.diceList = this.diceList.filter(d => d.id !== removedDsnDie.id);
+                this.deadDiceList = this.deadDiceList.filter(d => d.id !== removedDsnDie.id);
+                await this.physicsWorker.exec("removeDice", [removedDsnDie.id]);
+            }
+        },
+
         getPreThrowVectors(notationVectors) {
             for (let i = 0; i < notationVectors.dice.length; i++) {
                 const diceobj = this.dicefactory.get(notationVectors.dice[i].type);
@@ -101,8 +106,6 @@ const methods = {
 
         async preThrow(throws, callback) {
             this.isVisible = true;
-
-            //this.clearDice();
 
             throws.forEach(notation => {
                 notation = this.getPreThrowVectors(notation);
@@ -137,7 +140,79 @@ const methods = {
             
             this.removeTicker(this.animateThrow);
             canvas.app.ticker.add(this.animateThrow, this);
-        }    
+        },
+
+        assignSpecialEffects() {
+            // Base logic originally in DiceNotation.mergeQueuedRollCommands (changed very little)
+
+            // We need some prep to bring missing info into the actual dsn dice
+            this.currentResolver.roll.dice.forEach(fvttDie => {
+                fvttDie.results.forEach(result => {
+                    if (result.discarded) {
+                        const dsnDice = allDsnDice.filter(d => result.dsnDiceId.includes(d.id));
+                        dsnDice.forEach(dsnDie => {
+                            dsnDie.discarded = true;
+                        })
+                    }
+                });
+            });
+
+            //Retrieve the sfx list (unfiltered) for this throw. We do not know yet if these sfx should be visible or not            
+            for (let k=0; k<this.diceList.length; k++) {
+                const dsnDie = this.diceList[k];
+                let sfxList = dsnDie.options.dsnConfig.specialEffects;
+
+                //attach SFX that should trigger for this roll
+                //For each sfx configured
+                let specialEffects = Object.values(sfxList).filter(sfx => {
+                    //if the dice is discarded, it should not trigger a special fx
+                    if (dsnDie.discarded) // STILL MISSING
+                        return false;
+                    
+                    //if the dice is a ghost dice, it should not trigger a special fx
+                    if (dsnDie.options.ghost)
+                        return false;
+
+                    //if the special effect "onResult" list contains non-numeric value, we manually deal with them here
+                    let manualResultTrigger = false;
+                    //Keep Highest. Discarded dice are already filtered out
+                    if (sfx.onResult.includes("kh"))
+                        manualResultTrigger = dsnDie.options?.modifiers?.includes("kh");
+                    //Keep Lowest. Discarded dice are already filtered out
+                    if (sfx.onResult.includes("kl"))
+                        manualResultTrigger = dsnDie.options?.modifiers?.includes("kl");
+
+                    if (manualResultTrigger)
+                        return true;
+
+                    //if the result is in the triggers value, we keep the fx. Special case: double d10 for a d100 roll
+                    if (sfx.diceType == "d100"){
+                        if (dsnDie.d100Result && sfx.onResult.includes(dsnDie.d100Result.toString()))
+                            return true;
+                    } else {
+                        if (sfx.diceType == dsnDie.notation.type && sfx.onResult.includes(dsnDie.result.toString()))
+                            return true;
+                    }
+                        
+                    //if a special effect was manually triggered for this dice, we also include it
+                    if (dsnDie.options.sfx && dsnDie.options.sfx.id == sfx.diceType && sfx.onResult.includes(dsnDie.options.sfx.result.toString()))
+                        return true;
+
+                    return false;
+                });
+                //Now that we have a filtered list of sfx to play, we make a final list of all sfx for this die and we remove the duplicates
+                if (dsnDie.options.sfx && dsnDie.options.sfx.specialEffect)
+                    specialEffects.push({
+                        specialEffect: dsnDie.options.sfx.specialEffect,
+                        options: dsnDie.options.sfx.options
+                    });
+                if (specialEffects.length) {
+                    //remove duplicate
+                    specialEffects = specialEffects.filter((v, i, a) => a.indexOf(v) === i);
+                    dsnDie.specialEffects = specialEffects;
+                }
+            }
+        }
     }
 };
 
@@ -147,6 +222,8 @@ export function addMethods(dice3d) {
     dice3d.preRoll = methods.dice3d.preRoll.bind(dice3d);
     dice3d.box.onMouseDown = methods.diceBox.onMouseDown.bind(dice3d.box);
     dice3d.box.onMouseUp = methods.diceBox.onMouseUp.bind(dice3d.box);
+    dice3d.box.removeDice = methods.diceBox.removeDice.bind(dice3d.box);
     dice3d.box.preThrow = methods.diceBox.preThrow.bind(dice3d.box);
     dice3d.box.getPreThrowVectors = methods.diceBox.getPreThrowVectors.bind(dice3d.box);
+    dice3d.box.assignSpecialEffects = methods.diceBox.assignSpecialEffects.bind(dice3d.box);
 }

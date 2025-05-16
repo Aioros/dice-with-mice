@@ -115,7 +115,10 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
             await DSNThrower._physicsWorker.exec("allowSleeping", {allow: false});
 
             game.dice3d.activateListeners();
-            game.dice3d.preRoll(preRoll);
+            game.dice3d.preRoll(preRoll)
+                .then(() => {
+                    resolver.preThrowDice = game.dice3d.box.diceList.map(d => d.id);
+                });
 
             DSNThrower._physicsWorker.off("worldAsleep");
             DSNThrower._physicsWorker.on("worldAsleep", async () => {
@@ -135,15 +138,14 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
                             resultDSNDice.push(d10ofd100);
                             const d10Value = await DSNThrower._physicsWorker.exec("getDiceValue", d10ofd100.id);
                             dsnDie.result += d10Value % 10;
+                            dsnDie.d100result = dsnDie.result;
+                            d10ofd100.d100result = dsnDie.result;
                         }
                         this.registerDSNResult(DSNThrower.METHOD, resultDSNDice);
                     }
 
-                    // Autosubmit if all done
-                    setTimeout(() => {
-                        //console.log(game.dice3d.box.diceList);
-                        //this._checkDone();
-                    }, 2000); // this timer should be a setting
+                    resolver.preThrowDice = [];
+                    game.dice3d.box.clearDice();
                 }
             });
 
@@ -168,14 +170,26 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
         const input = Array.from(this.element.querySelectorAll(query)).find(input => input.value === "");
         input.value = `${dsnDie.result}`;
         input.dataset.dsnDiceId = JSON.stringify(dsnDice.map(d => d.id));
-        //const submitInput = input.closest(".form-fields")?.querySelector("button");
-        //if ( submitInput ) submitInput.dispatchEvent(new MouseEvent("click"));
-        //else this._checkDone();
+        const submitInput = input.closest(".form-fields")?.querySelector("button");
+        if ( submitInput ) submitInput.dispatchEvent(new MouseEvent("click"));
+        else this._checkDone();
         return true;
     }
 
     async close(options={}) {
-        DSNThrower._physicsWorker.off("worldAsleep");
+        if (this.preThrowDice.length) {
+            // We are just canceling the roll
+            await this.reset();
+        } else {
+            // All done, run effects and aftershow
+            game.dice3d.box.diceList = [...game.dice3d.box.deadDiceList];
+            game.dice3d.box.deadDiceList = [];
+            game.dice3d.box.assignSpecialEffects();
+            game.dice3d.box.handleSpecialEffectsInit().then(() => {
+                game.dice3d._afterShow();
+            });
+        }
+
         return super.close(options);
     }
 
@@ -184,23 +198,33 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
         return super._onSubmitForm(formConfig, event);
     }
 
+    async reset() {
+        DSNThrower._physicsWorker.off("worldAsleep");
+        game.dice3d.deactivateListeners();
+        await game.dice3d.box.clearAll();
+        await this.setThrowerState(DSNThrower.DSNTHROWER_STATES.INACTIVE);
+    }
+
     async resolveResult(term, method, { reroll=false, explode=false }={}) {
         this.element.querySelectorAll(`input[name="${term._id}"]:disabled`).forEach((input, i) => {
-            term.results[i].dsnDiceId = JSON.parse(input.dataset.dsnDiceId);
+            term.results[i].dsnDiceId = JSON.parse(input.dataset.dsnDiceId ?? "[]");
         });
-        this.spawnDice(term);
+        if (reroll) {
+            this.spawnDice(term);
+        }
         return super.resolveResult(term, method, { reroll, explode });
     }
 
     static async _fulfillRoll(event, form, formData) {
         // Update the DiceTerms with the fulfilled values.
+        // This also adds DSN die information to each result, to allow removal of the latest rerolled die
         for ( let [id, results] of Object.entries(formData.object) ) {
             const { term } = this.fulfillable.get(id);
             if ( !Array.isArray(results) ) results = [results];
-            if (form) {
+            if (form) { // _fulfillRole is also called on close, with no event or form
                 results.forEach((result, i) => {
                     const input = form.querySelectorAll(`input[name="${id}"]`)[i];
-                    const roll = { result: undefined, active: true, dsnDiceId: JSON.parse(input.dataset.dsnDiceId)};
+                    const roll = { result: undefined, active: true, dsnDiceId: JSON.parse(input.dataset.dsnDiceId ?? "[]")};
                     // A null value indicates the user wishes to skip external fulfillment and fall back to the digital roll.
                     if ( result === null ) roll.result = term.randomFace();
                     else roll.result = result;
