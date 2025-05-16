@@ -1,7 +1,7 @@
 {
-    "id": "dice-thrower",
-    "title": "Dice Thrower",
-    "description": "Dice Thrower",
+    "id": "dice-with-mice",
+    "title": "Dice With Mice!",
+    "description": "All of Dice So Nice's 3D goodness, but you throw them yourself. With your... mice. It's ok because it rhymes.",
     "version": "0.1.0",
     "compatibility": {
         "minimum": "12.331",
@@ -23,7 +23,14 @@
         ]
     },
     "esmodules": [
-        "./scripts/dice-thrower.js"
+        "./scripts/dice-with-mice.js"
+    ],
+    "languages": [
+        {
+            "lang": "en",
+            "name": "English",
+            "path": "./lang/en.json"
+        }
     ],
     "socket": true,
     "url": "",

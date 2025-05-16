@@ -1,7 +1,7 @@
 import { PhysicsWorkerWithPromise } from "./PhysicsWorkerWithPromise.js";
 import { deepProxy } from "./utils.js";
 
-export class DSNThrower extends foundry.applications.dice.RollResolver {
+export class DWMResolver extends foundry.applications.dice.RollResolver {
 
     constructor(roll, options={}) {
         super(roll, options);
@@ -23,24 +23,24 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
         this._physicsWorker = new PhysicsWorkerWithPromise({workerUrl: new URL("PhysicsWorker.js", import.meta.url), workerName: "PhysicsWorker"});
     }
 
-    static METHOD = "dsnThrower";
+    static METHOD = "dwmResolver";
 
-    static DSNTHROWER_STATES = {
+    static DWM_RESOLVER_STATES = {
         INACTIVE: 0,
         READY: 1,
         ROLLING: 2,
     }
 
     static get instances() {
-        return [...foundry.applications.instances.values()].filter(i => i instanceof DSNThrower);
+        return [...foundry.applications.instances.values()].filter(i => i instanceof DWMResolver);
     }
 
     static DEFAULT_OPTIONS = {
-        id: "dsn-thrower-{id}",
+        id: "dwm-resolver-{id}",
         tag: "form",
         classes: ["roll-resolver"],
         window: {
-            title: "DICE.DSNThrowerRollResolution",//"DICE.RollResolution"
+            title: "DICE.DWMResolverRollResolution",//"DICE.RollResolution"
         },
         position: {
             width: 500,
@@ -53,14 +53,14 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
             handler: this._fulfillRoll
         },
         actions: {
-            spawnDice: DSNThrower.spawnDiceAction
+            spawnDice: DWMResolver.spawnDiceAction
         }
     };
 
     static PARTS = {
         form: {
             id: "form",
-            template: "modules/dice-thrower/templates/roll-resolver.hbs"
+            template: "modules/dice-with-mice/templates/roll-resolver.hbs"
         }
     };
 
@@ -70,7 +70,7 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
 
     async _prepareContext(_options) {
         const context = await super._prepareContext(_options);
-        context.rollDisabled = this.throwerState >= DSNThrower.DSNTHROWER_STATES.READY;
+        context.rollDisabled = this.throwerState >= DWMResolver.DWM_RESOLVER_STATES.READY;
         return context;
     }
 
@@ -81,7 +81,7 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
     }
 
     get throwable() {
-        return [...this.fulfillable.values().filter(f => f.method === DSNThrower.METHOD)];
+        return [...this.fulfillable.values().filter(f => f.method === DWMResolver.METHOD)];
     }
 
     getFilledInputs(name) {
@@ -110,9 +110,9 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
             const preRoll = {dice};
 
             // Place the dice under the mouse
-            await this.setThrowerState(DSNThrower.DSNTHROWER_STATES.READY);
+            await this.setThrowerState(DWMResolver.DWM_RESOLVER_STATES.READY);
             // Prevent the physics world from sleeping until the dice is actually thrown
-            await DSNThrower._physicsWorker.exec("allowSleeping", {allow: false});
+            await DWMResolver._physicsWorker.exec("allowSleeping", {allow: false});
 
             game.dice3d.activateListeners();
             game.dice3d.preRoll(preRoll)
@@ -120,28 +120,28 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
                     resolver.preThrowDice = game.dice3d.box.diceList.map(d => d.id);
                 });
 
-            DSNThrower._physicsWorker.off("worldAsleep");
-            DSNThrower._physicsWorker.on("worldAsleep", async () => {
-                if (this.throwerState === DSNThrower.DSNTHROWER_STATES.ROLLING) {
+            DWMResolver._physicsWorker.off("worldAsleep");
+            DWMResolver._physicsWorker.on("worldAsleep", async () => {
+                if (this.throwerState === DWMResolver.DWM_RESOLVER_STATES.ROLLING) {
                     //console.log("Manual throw done");
-                    await this.setThrowerState(DSNThrower.DSNTHROWER_STATES.INACTIVE); // this disables additional manual throws; could think of something like a minimum roll time
+                    await this.setThrowerState(DWMResolver.DWM_RESOLVER_STATES.INACTIVE); // this disables additional manual throws; could think of something like a minimum roll time
                     game.dice3d.deactivateListeners();
 
                     for (const dsnDie of game.dice3d.box.diceList) {
                         const resultDSNDice = [dsnDie];
                         const fvttDie = preRoll.dice.find(d => d._id === dsnDie.options._originalId);
-                        dsnDie.result = await DSNThrower._physicsWorker.exec("getDiceValue", dsnDie.id);
+                        dsnDie.result = await DWMResolver._physicsWorker.exec("getDiceValue", dsnDie.id);
                         if (fvttDie.faces === 100) {
                             if (dsnDie.notation.type === "d10") continue;
                             dsnDie.result = dsnDie.result % 10 * 10;
                             const d10ofd100 = game.dice3d.box.diceList.find(d => d.options._originalId === dsnDie.options._originalId && d.options._index === dsnDie.options._index && d.id !== dsnDie.id);
                             resultDSNDice.push(d10ofd100);
-                            const d10Value = await DSNThrower._physicsWorker.exec("getDiceValue", d10ofd100.id);
+                            const d10Value = await DWMResolver._physicsWorker.exec("getDiceValue", d10ofd100.id);
                             dsnDie.result += d10Value % 10;
                             dsnDie.d100result = dsnDie.result;
                             d10ofd100.d100result = dsnDie.result;
                         }
-                        this.registerDSNResult(DSNThrower.METHOD, resultDSNDice);
+                        this.registerDSNResult(DWMResolver.METHOD, resultDSNDice);
                     }
 
                     resolver.preThrowDice = [];
@@ -153,7 +153,7 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
     }
 
     async awaitFulfillment() {
-        this.throwerState = DSNThrower.DSNTHROWER_STATES.INACTIVE;
+        this.throwerState = DWMResolver.DWM_RESOLVER_STATES.INACTIVE;
 
         const originalPromise = super.awaitFulfillment();
 
@@ -194,15 +194,15 @@ export class DSNThrower extends foundry.applications.dice.RollResolver {
     }
 
     async _onSubmitForm(formConfig, event) {
-        DSNThrower._physicsWorker.off("worldAsleep");
+        DWMResolver._physicsWorker.off("worldAsleep");
         return super._onSubmitForm(formConfig, event);
     }
 
     async reset() {
-        DSNThrower._physicsWorker.off("worldAsleep");
+        DWMResolver._physicsWorker.off("worldAsleep");
         game.dice3d.deactivateListeners();
         await game.dice3d.box.clearAll();
-        await this.setThrowerState(DSNThrower.DSNTHROWER_STATES.INACTIVE);
+        await this.setThrowerState(DWMResolver.DWM_RESOLVER_STATES.INACTIVE);
     }
 
     async resolveResult(term, method, { reroll=false, explode=false }={}) {

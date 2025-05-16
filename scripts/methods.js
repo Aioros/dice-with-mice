@@ -72,8 +72,8 @@ const methods = {
         },
 
         async onMouseUp(event) {
-            if (this.currentResolver && this.currentResolver.throwerState === this.currentResolver.constructor.DSNTHROWER_STATES.READY) {
-                await this.currentResolver.setThrowerState(this.currentResolver?.constructor.DSNTHROWER_STATES.ROLLING);
+            if (this.currentResolver && this.currentResolver.throwerState === this.currentResolver.constructor.DWM_RESOLVER_STATES.READY) {
+                await this.currentResolver.setThrowerState(this.currentResolver?.constructor.DWM_RESOLVER_STATES.ROLLING);
                 await this.physicsWorker.exec("allowSleeping", true);
             }
             this.constructor.prototype.onMouseUp.call(this, event);
