@@ -149,7 +149,7 @@ const methods = {
             this.currentResolver.roll.dice.forEach(fvttDie => {
                 fvttDie.results.forEach(result => {
                     if (result.discarded) {
-                        const dsnDice = allDsnDice.filter(d => result.dsnDiceId.includes(d.id));
+                        const dsnDice = this.diceList.filter(d => result.dsnDiceId.includes(d.id));
                         dsnDice.forEach(dsnDie => {
                             dsnDie.discarded = true;
                         })
