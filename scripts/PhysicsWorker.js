@@ -1,5 +1,5 @@
 import { World, Material, NaiveBroadphase, ContactMaterial, Body, Plane, Vec3, Sphere, PointToPointConstraint, Cylinder, ConvexPolyhedron } from "../lib/cannon-es.0.20.0.min.js";
-import { DICE_SHAPE } from "../lib/foundryvtt-dice-so-nice/module/DiceModels.js";
+import { DICE_SHAPE } from "../lib/DSN/DiceModels.js";
 import { Vector3 } from "../../dice-so-nice/libs/three.module.min.js";
 
 // This is just to keep the same interface as webworker-promise and leave original code inside methods intact. Similar for host.emit().

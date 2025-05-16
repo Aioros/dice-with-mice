@@ -66,11 +66,17 @@ const methods = {
     },
 
     diceBox: {
+        /**
+         * @override
+         */
         async onMouseDown(event, ndc) {
             if (!!this.currentResolver?.throwerState) return true;
             return this.constructor.prototype.onMouseDown.call(this, event, ndc);
         },
 
+        /**
+         * @override
+         */
         async onMouseUp(event) {
             if (this.currentResolver && this.currentResolver.throwerState === this.currentResolver.constructor.DWM_RESOLVER_STATES.READY) {
                 await this.currentResolver.setThrowerState(this.currentResolver?.constructor.DWM_RESOLVER_STATES.ROLLING);
@@ -103,7 +109,7 @@ const methods = {
             }
             return notationVectors;
         },
-
+        
         async preThrow(throws, callback) {
             this.isVisible = true;
 
@@ -217,13 +223,12 @@ const methods = {
 };
 
 export function addMethods(dice3d) {
-    dice3d.activateListeners = methods.dice3d.activateListeners.bind(dice3d);
-    dice3d.deactivateListeners = methods.dice3d.deactivateListeners.bind(dice3d);
-    dice3d.preRoll = methods.dice3d.preRoll.bind(dice3d);
-    dice3d.box.onMouseDown = methods.diceBox.onMouseDown.bind(dice3d.box);
-    dice3d.box.onMouseUp = methods.diceBox.onMouseUp.bind(dice3d.box);
-    dice3d.box.removeDice = methods.diceBox.removeDice.bind(dice3d.box);
-    dice3d.box.preThrow = methods.diceBox.preThrow.bind(dice3d.box);
-    dice3d.box.getPreThrowVectors = methods.diceBox.getPreThrowVectors.bind(dice3d.box);
-    dice3d.box.assignSpecialEffects = methods.diceBox.assignSpecialEffects.bind(dice3d.box);
+
+    Object.keys(methods.dice3d).forEach(key => {
+        dice3d[key] = methods.dice3d[key].bind(dice3d);
+    });
+    Object.keys(methods.diceBox).forEach(key => {
+        dice3d.box[key] = methods.diceBox[key].bind(dice3d.box);
+    });
+    
 }
