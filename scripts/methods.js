@@ -1,4 +1,4 @@
-import { DiceNotation as CustomDiceNotation } from "./DiceNotation.js";
+import { DiceNotation as DWMDiceNotation } from "../lib/DSN/DiceNotation.js";
 
 const methods = {
     dice3d: {
@@ -45,7 +45,7 @@ const methods = {
 
         async preRoll(roll, callback) {
             const Dice3D = this.constructor;
-            const notation = new CustomDiceNotation(roll, Dice3D.ALL_CONFIG(game.user), game.user);
+            const notation = new DWMDiceNotation(roll, Dice3D.ALL_CONFIG(game.user), game.user);
             notation.dsnConfig = Dice3D.ALL_CUSTOMIZATION(game.user, this.DiceFactory);
             notation.throws.forEach(t => {
                 t.dsnConfig = notation.dsnConfig;
@@ -230,5 +230,5 @@ export function addMethods(dice3d) {
     Object.keys(methods.diceBox).forEach(key => {
         dice3d.box[key] = methods.diceBox[key].bind(dice3d.box);
     });
-    
+
 }

@@ -1,4 +1,4 @@
-import { PhysicsWorkerWithPromise } from "./PhysicsWorkerWithPromise.js";
+import { PhysicsWorkerWithPromise } from "../lib/PhysicsWorkerWithPromise.js";
 import { deepProxy } from "./utils.js";
 
 export class DWMResolver extends foundry.applications.dice.RollResolver {
@@ -20,7 +20,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
 
     static _physicsWorker;
     static {
-        this._physicsWorker = new PhysicsWorkerWithPromise({workerUrl: new URL("PhysicsWorker.js", import.meta.url), workerName: "PhysicsWorker"});
+        this._physicsWorker = new PhysicsWorkerWithPromise({workerUrl: new URL("../lib/DSN/PhysicsWorker.js", import.meta.url), workerName: "PhysicsWorker"});
     }
 
     static METHOD = "dwmResolver";
@@ -40,7 +40,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         tag: "form",
         classes: ["roll-resolver"],
         window: {
-            title: "DICE.DWMResolverRollResolution",//"DICE.RollResolution"
+            title: "DICE.DWMResolverRollResolution",
         },
         position: {
             width: 500,
