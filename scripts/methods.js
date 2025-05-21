@@ -1,5 +1,7 @@
 import { DiceNotation as DWMDiceNotation } from "../lib/DSN/DiceNotation.js";
 
+let broadcastInterval;
+
 const methods = {
     dice3d: {
         activateListeners() {
@@ -81,9 +83,32 @@ const methods = {
             if (this.currentResolver && this.currentResolver.throwerState === this.currentResolver.constructor.DWM_RESOLVER_STATES.READY) {
                 await this.currentResolver.setThrowerState(this.currentResolver?.constructor.DWM_RESOLVER_STATES.ROLLING);
                 await this.physicsWorker.exec("allowSleeping", true);
+                
+                this.startDiceBroadcast();
             }
             this.constructor.prototype.onMouseUp.call(this, event);
             return false;
+        },
+
+        startDiceBroadcast() {
+            broadcastInterval = setInterval(this.sendDiceBroadcast.bind(this), 1000/30);
+            //canvas.app.ticker.add(this.sendDiceBroadcast, this);
+        },
+
+        endDiceBroadcast() {
+            clearInterval(broadcastInterval);
+            //this.removeTicker(this.sendDiceBroadcast);
+        },
+
+        sendDiceBroadcast() {
+            const data = {user: game.user.id, dice: {}};
+            this.currentResolver.throwingDice.forEach(id => {
+                const group = this.scene.children.find(c => c.children[0]?.id === id);
+                if (group) {
+                    data.dice[id] = {type: group.children[0].notation.type, position: group.position, quaternion: group.quaternion};
+                }
+            });
+            game.socket.emit("module.dice-with-mice", {type: "roll", payload: data});
         },
 
         async removeDice(ids) {

@@ -64,6 +64,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         }
     };
 
+    // Called with `this` bound to instance
     static async spawnDiceAction() {
         return this.spawnDice();
     }
@@ -71,6 +72,13 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
     async _prepareContext(_options) {
         const context = await super._prepareContext(_options);
         context.rollDisabled = this.throwerState >= DWMResolver.DWM_RESOLVER_STATES.READY;
+
+        console.log(context);
+
+        Object.values(context.groups).forEach(g => {
+            g.method = g.results[0].method;
+        });
+
         return context;
     }
 
@@ -117,7 +125,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
             game.dice3d.activateListeners();
             game.dice3d.preRoll(preRoll)
                 .then(() => {
-                    resolver.preThrowDice = game.dice3d.box.diceList.map(d => d.id);
+                    resolver.throwingDice = game.dice3d.box.diceList.map(d => d.id);
                 });
 
             DWMResolver._physicsWorker.off("worldAsleep");
@@ -144,7 +152,8 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
                         this.registerDSNResult(DWMResolver.METHOD, resultDSNDice);
                     }
 
-                    resolver.preThrowDice = [];
+                    resolver.throwingDice = [];
+                    game.dice3d.box.endDiceBroadcast();
                     game.dice3d.box.clearDice();
                 }
             });
@@ -177,7 +186,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
     }
 
     async close(options={}) {
-        if (this.preThrowDice.length) {
+        if (this.throwingDice.length) {
             // We are just canceling the roll
             await this.reset();
         } else {

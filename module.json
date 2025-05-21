@@ -25,6 +25,9 @@
     "esmodules": [
         "./scripts/dice-with-mice.js"
     ],
+    "styles": [
+        "./styles/dice-with-mice.css"
+    ],
     "languages": [
         {
             "lang": "en",

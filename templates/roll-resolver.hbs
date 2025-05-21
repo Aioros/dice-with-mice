@@ -2,13 +2,15 @@
     <button type="button" class="roll" data-action="spawnDice"{{#if rollDisabled}}disabled{{/if}}>Roll</button>
     <p class="formula">{{ formula }}</p>
     {{#each groups}}
-    <fieldset class="input-grid" data-term-id="{{ @key }}">
+    <fieldset class="input-grid" data-term-id="{{ @key }}" data-method="{{ method }}">
         <legend>{{ label }} <span data-tooltip="{{ tooltip }}" aria-label="{{ tooltip }}">{{{ icon }}}</span></legend>
         {{#each results}}
-        <label class="icon die-input {{#if isNew}}new-addition{{/if}}" data-denomination="{{ denomination }}"
-               data-method="{{ method }}">
-            {{ numberInput value min=1 max=faces step=1 name=id readonly=readonly placeholder=(localize denomination)
-                           disabled=disabled autofocus=true }}
+        {{#if (eq method "dwmResolver")}}<div class="dwm-result">{{ value }}</div>{{/if}}
+        <label class="icon die-input {{#if isNew}}new-addition{{/if}}"
+                data-denomination="{{ denomination }}"
+                data-method="{{ method }}"
+                {{#if (eq method "dwmResolver")}}style="display: none;"{{/if}}>
+            {{ numberInput value min=1 max=faces step=1 name=id readonly=readonly placeholder=(localize denomination) disabled=disabled autofocus=true }}
             {{#if rerolled}}<i class="fas fa-arrow-rotate-right"></i>{{/if}}
             {{#if exploded}}<i class="fas fa-burst"></i>{{/if}}
             {{{ icon }}}

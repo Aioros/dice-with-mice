@@ -1,0 +1,10 @@
+.dwm-result {
+    width: 80px;
+    height: 80px;
+    border: 1px solid #aaa;
+    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: center;
+}

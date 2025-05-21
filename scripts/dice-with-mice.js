@@ -1,5 +1,9 @@
 import { DWMResolver } from "./DWMResolver.js";
+import { DWMTracker } from "./DWMTracker.js";
 import { addMethods } from "./methods.js";
+import { DieTracker } from "./DieTracker.js";
+
+customElements.define("dwm-die-tracker", DieTracker);
 
 Hooks.on("init", () => {
     CONFIG.Dice.fulfillment.methods[DWMResolver.METHOD] = {
@@ -8,24 +12,23 @@ Hooks.on("init", () => {
         label: "DICE.FULFILLMENT.DWMResolver",
         resolver: DWMResolver
     };
+
+    const tracker = new DWMTracker();
+    game.socket.on("module.dice-with-mice", async ({type, payload}) => {
+        if (!tracker.rendered) {
+            await tracker.render(true);
+        }
+        tracker.updateDiceData(payload);
+    });
 });
 
 Hooks.on("diceSoNiceReady", (dice3d) => {
-    // Needed by the rescoped showForRoll below
-    //const Dice3D = dice3d.constructor;
-
     // Replace the PhysicsWorker with our own
     dice3d.box.physicsWorker.terminate();
     dice3d.box.physicsWorker = DWMResolver._physicsWorker;
     dice3d.DiceFactory.physicsWorker.terminate();
     dice3d.DiceFactory.physicsWorker = DWMResolver._physicsWorker;
     dice3d.box.initialize();
-
-    //dice3d.box.swapDiceFace = () => {};
-
-    // Embarassing magic trick. We recreate the showForRoll function to make it use our own DiceNotation class
-    //let f;
-    //dice3d.showForRoll = eval("f = function " + dice3d.showForRoll.toString()).bind(dice3d);
 
     addMethods(dice3d);
 });
