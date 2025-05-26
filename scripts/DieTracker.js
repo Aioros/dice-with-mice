@@ -1,14 +1,20 @@
+import { PhysicsWorkerWithPromise } from "../lib/PhysicsWorkerWithPromise.js";
+import { methods } from "./methods.js";
+
 export class DieTracker extends HTMLElement {
 
-    static observedAttributes = ["quaternion"];
+    static observedAttributes = ["quaternion", "result"];
 
     #box;
     #mesh;
     #animationQuaternions;
-    #ticker;
+    #rollWaitingTicker;
+    #rollTicker;
+    #sfxTicker;
 
     constructor() {
         super();
+        this._internals = this.attachInternals();
     }
 
     async connectedCallback() {
@@ -26,28 +32,24 @@ export class DieTracker extends HTMLElement {
             }
         `);
         this.shadowRoot.adoptedStyleSheets = [stylesheet];
-
-        //console.log(mainDiv.clientWidth, mainDiv.clientHeight);
+        
         const DiceBox = game.dice3d.box.constructor;
+
         const boxConfig = foundry.utils.mergeObject(
             game.dice3d.constructor.ALL_CONFIG(),
-            { dimensions: { w: mainDiv.clientWidth, h: mainDiv.clientHeight }, boxType: "showcase" }
+            { dimensions: { w: mainDiv.clientWidth, h: mainDiv.clientHeight }, boxType: `tracker-${this.dataset.userId}-${this.dataset.dieId}` } // Unique boxType ensures that we have different renderers
         );
         const box = new DiceBox(mainDiv, game.dice3d.DiceFactory, boxConfig);
         this.#box = box;
+
+        box.physicsWorker = new PhysicsWorkerWithPromise({stub: true}); // DiceBox.animateThrow will try to call it
+
         await box.initialize();
-        //console.log(box);
 
-        box.camera.position.z = box.cameraHeight.far;
-		box.camera.position.x = box.display.containerWidth / 2 - (box.display.containerWidth / 2);
-		box.camera.position.y = -box.display.containerHeight / 2 + (box.display.containerHeight / 2);
-		box.camera.fov = 4 * 2 * Math.atan(box.display.containerHeight / (2 * box.camera.position.z)) * (180 / Math.PI);
-		box.camera.updateProjectionMatrix();
-        box.last_time = window.performance.now();
-		box.framerate = 1 / 60;
-
-        const dsnConfig = game.dice3d.constructor.ALL_CUSTOMIZATION(game.user, game.dice3d.DiceFactory);
-        const appearance = box.dicefactory.getAppearanceForDice(dsnConfig.appearance, this.dataset.type);
+        const dsnConfig = game.dice3d.constructor.ALL_CUSTOMIZATION(game.users.get(this.dataset.userId), game.dice3d.DiceFactory);
+        const options = JSON.parse(this.dataset.options);
+        const notation = {options, type: this.dataset.type};
+        const appearance = box.dicefactory.getAppearanceForDice(dsnConfig.appearance, this.dataset.type, notation);
 		const dicemesh = await box.dicefactory.create(box.renderer.scopedTextureCache, this.dataset.type, appearance);
         this.#mesh = dicemesh;
         dicemesh.scale.set(
@@ -57,18 +59,40 @@ export class DieTracker extends HTMLElement {
         );
         dicemesh.position.set(0, 0, 50);
         dicemesh.castShadow = box.dicefactory.shadows;
+        dicemesh.notation = notation;
         dicemesh.userData = this.dataset.type;
+        dicemesh.options = options;
+
         box.diceList.push(dicemesh);
 
+        box.camera.position.z = box.cameraHeight.far;
+		box.camera.position.x = box.display.containerWidth / 2 - (box.display.containerWidth / 2);
+		box.camera.position.y = -box.display.containerHeight / 2 + (box.display.containerHeight / 2);
+		box.camera.fov = 4 * 2 * Math.atan(box.display.containerHeight / (2 * box.camera.position.z)) * (180 / Math.PI);
+        box.camera.lookAt(dicemesh.position);
+		box.camera.updateProjectionMatrix();
+        box.last_time = window.performance.now();
+		box.framerate = 1 / 60;
+
         box.scene.add(dicemesh);
+
         box.isVisible = true;
         box.renderScene();
 
-        this.#ticker = new PIXI.Ticker();
+        this.#rollWaitingTicker = new PIXI.Ticker();
+        this.#rollTicker = new PIXI.Ticker();
+        this.#sfxTicker = new PIXI.Ticker();
+
+        // Start waiting animation
+        this.last_time = window.performance.now();
+        this.#rollWaitingTicker.add(this.animateWaiting, this);
+        this.#rollWaitingTicker.start();
     }
 
     disconnectedCallback() {
-        console.log("Custom element removed from page.");
+        //console.log("Custom element removed from page.");
+        this.#rollTicker.destroy;
+        this.#sfxTicker.destroy;
     }
 
     connectedMoveCallback() {
@@ -80,16 +104,28 @@ export class DieTracker extends HTMLElement {
     }
 
     attributeChangedCallback(name, oldValue, newValue) {
-        //console.log(`Attribute ${name} has changed.`, oldValue, newValue);
         if (this.#mesh && name === "quaternion") {
             const Quaternion = this.#mesh.quaternion.constructor;
             const targetQuaternion = new Quaternion(...JSON.parse(newValue));
             this.#animationQuaternions = {start: this.#mesh.quaternion, end: targetQuaternion};
-            this.#ticker.destroy();
             this.last_time = null;
-            this.#ticker = new PIXI.Ticker();
-            this.#ticker.add(this.animate, this);
-            this.#ticker.start();
+            if (this.#rollWaitingTicker.started) {
+                this.#rollWaitingTicker.destroy();
+            }
+            if (!this.#rollTicker.started) {
+                this.#rollTicker.add(this.animate, this);
+                this.#rollTicker.start();
+            }
+        }
+        if (this.#mesh && name === "result") {
+            this.#mesh.result = newValue;
+            methods.diceBox.assignSpecialEffects.call(this.#box);
+            this.#sfxTicker.add(this.#box.animateThrow, this.#box); // Only needed for the SFX queue handling
+            this.#sfxTicker.start();
+            this.#box.handleSpecialEffectsInit().then(() => {
+                this._internals.states.add("complete");
+                this.dispatchEvent(new CustomEvent("dieCompleted", { bubbles: true, composed: true }));
+            });
         }
     }
 
@@ -106,7 +142,21 @@ export class DieTracker extends HTMLElement {
         this.#box.renderScene();
 
         if (Math.abs(t - 1) < 0.001) {
-            this.#ticker.destroy();
+            this.#rollTicker.destroy();
         }
     }
+
+    animateWaiting() {
+		let now = window.performance.now();
+		let elapsed = now - this.last_time;
+		if (elapsed > this.#box.framerate) {
+			this.last_time = now - (elapsed % this.#box.framerate);
+            let angle_change = 0.005 * Math.PI;
+            this.#mesh.rotation.y += angle_change;
+            this.#mesh.rotation.x += angle_change / 4;
+            this.#mesh.rotation.z += angle_change / 10;
+			this.#box.renderScene();
+		}
+	}
+
 }

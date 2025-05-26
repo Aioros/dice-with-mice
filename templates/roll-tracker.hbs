@@ -1,10 +1,12 @@
 <div class="dwm-tracker-container">
+{{!--
 {{#each data}}
     <fieldset class="input-grid" data-user-id="{{ @key }}">
         <legend>{{@key}}</legend>
         {{#each dice}}
-            <div class="dwm-result" data-die-id="{{@key}}"></div>
+            <dwm-die-tracker class="dwm-result" data-die-id="{{@key}}"></dwm-die-tracker>
         {{/each}}
     </fieldset>
 {{/each}}
+--}}
 </div>

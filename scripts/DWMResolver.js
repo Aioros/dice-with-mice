@@ -73,8 +73,6 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         const context = await super._prepareContext(_options);
         context.rollDisabled = this.throwerState >= DWMResolver.DWM_RESOLVER_STATES.READY;
 
-        console.log(context);
-
         Object.values(context.groups).forEach(g => {
             g.method = g.results[0].method;
         });
@@ -186,7 +184,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
     }
 
     async close(options={}) {
-        if (this.throwingDice.length) {
+        if (this.throwingDice?.length) {
             // We are just canceling the roll
             await this.reset();
         } else {
@@ -197,6 +195,8 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
             game.dice3d.box.handleSpecialEffectsInit().then(() => {
                 game.dice3d._afterShow();
             });
+            const results = game.dice3d.box.diceList.map(d => ({id: d.id, result: d.result}));
+            game.socket.emit("module.dice-with-mice", { type: "rollCompleted", payload: { user: game.user.id, results }});
         }
 
         return super.close(options);
@@ -218,9 +218,9 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         this.element.querySelectorAll(`input[name="${term._id}"]:disabled`).forEach((input, i) => {
             term.results[i].dsnDiceId = JSON.parse(input.dataset.dsnDiceId ?? "[]");
         });
-        if (reroll) {
+        //if (reroll) { // Why did I have this?
             this.spawnDice(term);
-        }
+        //}
         return super.resolveResult(term, method, { reroll, explode });
     }
 

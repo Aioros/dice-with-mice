@@ -14,12 +14,7 @@ Hooks.on("init", () => {
     };
 
     const tracker = new DWMTracker();
-    game.socket.on("module.dice-with-mice", async ({type, payload}) => {
-        if (!tracker.rendered) {
-            await tracker.render(true);
-        }
-        tracker.updateDiceData(payload);
-    });
+    tracker.listen();
 });
 
 Hooks.on("diceSoNiceReady", (dice3d) => {

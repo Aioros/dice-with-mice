@@ -1,10 +1,22 @@
+fieldset.dwm-results {
+    display: flex;
+    gap: 8px;
+}
+
 .dwm-result {
     width: 80px;
     height: 80px;
     border: 1px solid #aaa;
     border-radius: 8px;
-    display: flex;
-    flex-wrap: wrap;
-    align-content: center;
-    justify-content: center;
+    position: relative;
+
+    &.rerolled::before {
+        display: block;
+        font-family: "Font Awesome 6 Pro";
+        font-weight: 900;
+        content: "\f01e";
+        position: absolute;
+        right: 0;
+        margin: 4px;
+    }
 }

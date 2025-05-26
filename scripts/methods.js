@@ -2,7 +2,7 @@ import { DiceNotation as DWMDiceNotation } from "../lib/DSN/DiceNotation.js";
 
 let broadcastInterval;
 
-const methods = {
+export const methods = {
     dice3d: {
         activateListeners() {
             // Add some necessary listeners if not already there because of a DSN setting
@@ -54,8 +54,10 @@ const methods = {
                 t.dice.forEach(d => { d.options.dsnConfig = notation.dsnConfig });
             });
 
+            let allRerolledDiceId = [];
             for (const die of roll.dice) {
                 const rerolledDiceId = die.results.find(r => r.lastRerolled)?.dsnDiceId || [];
+                allRerolledDiceId.push(...rerolledDiceId);
                 this.box.removeDice(rerolledDiceId);
             }
 
@@ -63,7 +65,7 @@ const methods = {
             this.box.renderScene();
             this._beforeShow();
             
-            await this.box.preThrow(notation.throws, callback);
+            await this.box.preThrow(notation.throws, callback, allRerolledDiceId);
         }
     },
 
@@ -92,12 +94,10 @@ const methods = {
 
         startDiceBroadcast() {
             broadcastInterval = setInterval(this.sendDiceBroadcast.bind(this), 1000/30);
-            //canvas.app.ticker.add(this.sendDiceBroadcast, this);
         },
 
         endDiceBroadcast() {
             clearInterval(broadcastInterval);
-            //this.removeTicker(this.sendDiceBroadcast);
         },
 
         sendDiceBroadcast() {
@@ -108,7 +108,7 @@ const methods = {
                     data.dice[id] = {type: group.children[0].notation.type, position: group.position, quaternion: group.quaternion};
                 }
             });
-            game.socket.emit("module.dice-with-mice", {type: "roll", payload: data});
+            game.socket.emit("module.dice-with-mice", {type: "updateDice", payload: data});
         },
 
         async removeDice(ids) {
@@ -135,7 +135,7 @@ const methods = {
             return notationVectors;
         },
         
-        async preThrow(throws, callback) {
+        async preThrow(throws, callback, allRerolledDiceId) {
             this.isVisible = true;
 
             throws.forEach(notation => {
@@ -148,6 +148,17 @@ const methods = {
                     notationVectors.dice[i].startAtIteration = j * this.nbIterationsBetweenRolls;
                     let appearance = this.dicefactory.getAppearanceForDice(notationVectors.dsnConfig.appearance, notationVectors.dice[i].type, notationVectors.dice[i]);
                     await this.spawnDice(notationVectors.dice[i], appearance);
+                    const dieId = this.diceList[this.diceList.length - 1].id;
+                    const options = notationVectors.dice[i].options;
+                    if (allRerolledDiceId.length > i) { // This covers the d100 situation, each die only replaces one of the originals
+                        options.replace = allRerolledDiceId[i];
+                    }
+                    const dieData = { options, type: notationVectors.dice[i].type };
+                    const payload = {
+                        user: game.user.id,
+                        dice: {[dieId]: dieData}
+                    };
+                    game.socket.emit("module.dice-with-mice", { type: "updateDice", payload });
                 }
             }
 
@@ -177,16 +188,18 @@ const methods = {
             // Base logic originally in DiceNotation.mergeQueuedRollCommands (changed very little)
 
             // We need some prep to bring missing info into the actual dsn dice
-            this.currentResolver.roll.dice.forEach(fvttDie => {
-                fvttDie.results.forEach(result => {
-                    if (result.discarded) {
-                        const dsnDice = this.diceList.filter(d => result.dsnDiceId.includes(d.id));
-                        dsnDice.forEach(dsnDie => {
-                            dsnDie.discarded = true;
-                        })
-                    }
+            if (this.currentResolver) {
+                this.currentResolver.roll.dice.forEach(fvttDie => {
+                    fvttDie.results.forEach(result => {
+                        if (result.discarded) {
+                            const dsnDice = this.diceList.filter(d => result.dsnDiceId.includes(d.id));
+                            dsnDice.forEach(dsnDie => {
+                                dsnDie.discarded = true;
+                            })
+                        }
+                    });
                 });
-            });
+            }
 
             //Retrieve the sfx list (unfiltered) for this throw. We do not know yet if these sfx should be visible or not            
             for (let k=0; k<this.diceList.length; k++) {
