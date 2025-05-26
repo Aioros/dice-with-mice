@@ -82,6 +82,23 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
 
     throwerState;
 
+    get broadcastTargets() {
+        let broadcastTargets;
+        const rollMode = game.settings.get("core", "rollMode"); // PUBLIC, SELF, or PRIVATE. BLIND is not interactive.
+        const activeUsers = game.users.filter(u => u.active && !u.isSelf);
+
+        if (rollMode === CONST.DICE_ROLL_MODES.PUBLIC || !game.settings.get("dice-so-nice", "hide3dDiceOnSecretRolls")) {
+            broadcastTargets = activeUsers.map(u => ({user: u.id}));
+        } else {
+            if (game.settings.get("dice-so-nice", "showGhostDice") === "1") {
+                broadcastTargets = activeUsers.map(u => ({user: u.id, ghost: rollMode === CONST.DICE_ROLL_MODES.SELF || !u.isGM}));
+            } else {
+                broadcastTargets = activeUsers.filter(u => u.isGM && rollMode === CONST.DICE_ROLL_MODES.PRIVATE).map(u => ({user: u.id}));
+            }
+        }
+        return broadcastTargets;
+    }
+
     get physicsWorker() {
         return this.constructor._physicsWorker;
     }
@@ -196,7 +213,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
                 game.dice3d._afterShow();
             });
             const results = game.dice3d.box.diceList.map(d => ({id: d.id, result: d.result}));
-            game.socket.emit("module.dice-with-mice", { type: "rollCompleted", payload: { user: game.user.id, results }});
+            game.socket.emit("module.dice-with-mice", { type: "rollCompleted", payload: { user: game.user.id, results, broadcastTargets: this.broadcastTargets }});
         }
 
         return super.close(options);

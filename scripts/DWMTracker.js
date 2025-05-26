@@ -45,6 +45,9 @@ export class DWMTracker extends HandlebarsApplicationMixin(ApplicationV2) {
 
     listen() {
         game.socket.on("module.dice-with-mice", async ({type, payload}) => {
+            const target = payload.broadcastTargets.find(t => t.user === game.user.id);
+            if (!target) return;
+
             if (!this.rendered && !this.#renderQueued) {
                 this.#renderQueued = true;
                 this.#semaphore.add(this.render.bind(this), true)
@@ -63,12 +66,15 @@ export class DWMTracker extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     updateDiceData(newData) {
+        const ghost = newData.broadcastTargets.find(t => t.user === game.user.id).ghost;
+
         if (!this.#data[newData.user]) {
             this.#data[newData.user] = {dice: {}};
             this.addUser(newData.user);
         }
         Object.keys(newData.dice).forEach(dieId => {
             if (!this.#data[newData.user].dice[dieId]) {
+                newData.dice[dieId].options.ghost = ghost;
                 this.addDie(newData.user, dieId, newData.dice[dieId].type, newData.dice[dieId].options);
                 this.#data[newData.user].dice[dieId] = {};
             }

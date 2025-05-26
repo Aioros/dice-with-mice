@@ -65,10 +65,20 @@ export class DieTracker extends HTMLElement {
 
         box.diceList.push(dicemesh);
 
+        const Vector3 = box.camera.position.constructor;
+
         box.camera.position.z = box.cameraHeight.far;
-		box.camera.position.x = box.display.containerWidth / 2 - (box.display.containerWidth / 2);
-		box.camera.position.y = -box.display.containerHeight / 2 + (box.display.containerHeight / 2);
-		box.camera.fov = 4 * 2 * Math.atan(box.display.containerHeight / (2 * box.camera.position.z)) * (180 / Math.PI);
+        box.camera.position.x = box.display.containerWidth / 2 - (box.display.containerWidth / 2);
+        box.camera.position.y = -box.display.containerHeight / 2 + (box.display.containerHeight / 2);
+        box.camera.fov = 4 * 2 * Math.atan(box.display.containerHeight / (2 * box.camera.position.z)) * (180 / Math.PI);
+        
+        // We rotate the camera slightly. I prefer a perfect top view, but a d4 is very hard to read like that
+        box.camera.position.applyAxisAngle(new Vector3(1, 0, 0), Math.PI / 10);
+        
+        box.scene.remove(box.light);
+        box.light_amb.intensity = 4;
+        box.light_amb.position.copy(new Vector3(0, -1, 0));
+		
         box.camera.lookAt(dicemesh.position);
 		box.camera.updateProjectionMatrix();
         box.last_time = window.performance.now();

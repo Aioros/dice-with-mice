@@ -101,7 +101,7 @@ export const methods = {
         },
 
         sendDiceBroadcast() {
-            const data = {user: game.user.id, dice: {}};
+            const data = {user: game.user.id, dice: {}, broadcastTargets: this.currentResolver.broadcastTargets };
             this.currentResolver.throwingDice.forEach(id => {
                 const group = this.scene.children.find(c => c.children[0]?.id === id);
                 if (group) {
@@ -156,8 +156,10 @@ export const methods = {
                     const dieData = { options, type: notationVectors.dice[i].type };
                     const payload = {
                         user: game.user.id,
-                        dice: {[dieId]: dieData}
+                        dice: {[dieId]: dieData},
+                        broadcastTargets: this.currentResolver.broadcastTargets
                     };
+                    
                     game.socket.emit("module.dice-with-mice", { type: "updateDice", payload });
                 }
             }
