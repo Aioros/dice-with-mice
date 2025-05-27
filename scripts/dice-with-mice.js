@@ -36,19 +36,21 @@ Hooks.on("diceSoNiceMessageProcessed", (chatMessageId, interception) => {
     interception.willTrigger3DRoll = false;
 });
 
-Hooks.on("renderPlayerList", (playerList, html, data) => {
-    html = html.get?.(0) ?? html;
-    const hideTrackerSetting = game.settings.get("dice-with-mice", "hideTracker");
-    const button = document.createElement("span");
-    button.id = "toggleDWMTracker";
-    button.dataset.tooltip = `DWM.APPLICATION.PlayerListToggleTooltip.${hideTrackerSetting ? "Show" : "Hide"}`;//hideTrackerSetting ? "DWM.APPLICATION.PlayerListToggleTooltip.Show" : "Hide Dice Tracker";
-    button.classList.add("fa-solid", "fa-dice", hideTrackerSetting ? "hiding" : "showing");
-    button.addEventListener("click", (evt) => {
-        game.settings.set("dice-with-mice", "hideTracker", !hideTrackerSetting).then(() => playerList.render());
-        evt.preventDefault();
-        evt.stopPropagation();
-        return false;
+["renderPlayerList", "renderPlayers"].forEach(hookName => {
+    Hooks.on(hookName, (playerList, html, data) => {
+        html = html.get?.(0) ?? html;
+        const hideTrackerSetting = game.settings.get("dice-with-mice", "hideTracker");
+        const button = document.createElement("span");
+        button.id = "toggleDWMTracker";
+        button.dataset.tooltip = `DWM.APPLICATION.PlayerListToggleTooltip.${hideTrackerSetting ? "Show" : "Hide"}`;//hideTrackerSetting ? "DWM.APPLICATION.PlayerListToggleTooltip.Show" : "Hide Dice Tracker";
+        button.classList.add("fa-solid", "fa-dice", hideTrackerSetting ? "hiding" : "showing");
+        button.addEventListener("click", (evt) => {
+            game.settings.set("dice-with-mice", "hideTracker", !hideTrackerSetting).then(() => playerList.render());
+            evt.preventDefault();
+            evt.stopPropagation();
+            return false;
+        });
+        const location = html.querySelector("h3") || html.querySelector(".player.self");
+        location.appendChild(button);
     });
-    
-    html.querySelector("h3").appendChild(button);
 });
