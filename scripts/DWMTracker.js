@@ -13,17 +13,12 @@ export class DWMTracker extends HandlebarsApplicationMixin(ApplicationV2) {
         tag: "div",
         classes: ["dwm-tracker"],
         window: {
-            title: "DICE.DWMTrackerTitle",
+            title: "DWM.APPLICATION.DWMTracker.AppTitle",
         },
         position: {
             width: "auto",
             height: "auto"
         },
-        /*form: {
-            submitOnChange: false,
-            closeOnSubmit: false,
-            handler: this._fulfillRoll
-        }*/
     };
 
     /** @override */
@@ -52,6 +47,30 @@ export class DWMTracker extends HandlebarsApplicationMixin(ApplicationV2) {
         const context = await super._prepareContext(_options);
         context.data = this.#data;
         return context;
+    }
+
+    #positionSaveTimeout = null;
+    savePosition(pos) {
+        game.settings.set("dice-with-mice", "trackerPosition", { top: pos.top, left: pos.left });
+    }
+
+    /** @inheritDoc */
+    setPosition(position) {
+        const pos = super.setPosition(position);
+        if (this.#positionSaveTimeout) {
+            clearTimeout(this.#positionSaveTimeout);
+            this.#positionSaveTimeout = null;
+        }
+        this.#positionSaveTimeout = setTimeout(() => { this.savePosition(pos); }, 1000);
+        return pos;
+    }
+
+    /** @inheritDoc */
+    _initializeApplicationOptions(options) {
+        const applicationOptions = super._initializeApplicationOptions(options);
+        applicationOptions.position.top = game.settings.get("dice-with-mice", "trackerPosition")?.top ?? applicationOptions.position.top;
+        applicationOptions.position.left = game.settings.get("dice-with-mice", "trackerPosition")?.left ?? applicationOptions.position.left;
+        return applicationOptions;
     }
 
     listen() {

@@ -40,7 +40,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         tag: "form",
         classes: ["dwm-roll-resolver"],
         window: {
-            title: "DICE.DWMResolverRollResolution",
+            title: "DWM.APPLICATION.DWMResolver.AppTitle",
         },
         position: {
             width: 500,
@@ -69,6 +69,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         return this.spawnDice();
     }
 
+    /** @inheritDoc */
     async _prepareContext(_options) {
         const context = await super._prepareContext(_options);
         context.rollDisabled = this.throwerState >= DWMResolver.DWM_RESOLVER_STATES.READY;
@@ -78,6 +79,30 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         });
 
         return context;
+    }
+
+    #positionSaveTimeout = null;
+    savePosition(pos) {
+        game.settings.set("dice-with-mice", "resolverPosition", { top: pos.top, left: pos.left });
+    }
+
+    /** @inheritDoc */
+    setPosition(position) {
+        const pos = super.setPosition(position);
+        if (this.#positionSaveTimeout) {
+            clearTimeout(this.#positionSaveTimeout);
+            this.#positionSaveTimeout = null;
+        }
+        this.#positionSaveTimeout = setTimeout(() => { this.savePosition(pos); }, 1000);
+        return pos;
+    }
+
+    /** @inheritDoc */
+    _initializeApplicationOptions(options) {
+        const applicationOptions = super._initializeApplicationOptions(options);
+        applicationOptions.position.top = game.settings.get("dice-with-mice", "resolverPosition")?.top ?? applicationOptions.position.top;
+        applicationOptions.position.left = game.settings.get("dice-with-mice", "resolverPosition")?.left ?? applicationOptions.position.left;
+        return applicationOptions;
     }
 
     throwerState;

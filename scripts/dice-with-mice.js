@@ -12,7 +12,7 @@ Hooks.on("init", () => {
     CONFIG.Dice.fulfillment.methods[DWMResolver.METHOD] = {
         icon: "<i class=\"fa-solid fa-play\"></i>",
         interactive: true,
-        label: "DICE.FULFILLMENT.DWMResolver",
+        label: "DWM.FULFILLMENT.ResolverName",
         resolver: DWMResolver
     };
 
@@ -41,7 +41,7 @@ Hooks.on("renderPlayerList", (playerList, html, data) => {
     const hideTrackerSetting = game.settings.get("dice-with-mice", "hideTracker");
     const button = document.createElement("span");
     button.id = "toggleDWMTracker";
-    button.dataset.tooltip = hideTrackerSetting ? "Show Dice Tracker" : "Hide Dice Tracker";
+    button.dataset.tooltip = `DWM.APPLICATION.PlayerListToggleTooltip.${hideTrackerSetting ? "Show" : "Hide"}`;//hideTrackerSetting ? "DWM.APPLICATION.PlayerListToggleTooltip.Show" : "Hide Dice Tracker";
     button.classList.add("fa-solid", "fa-dice", hideTrackerSetting ? "hiding" : "showing");
     button.addEventListener("click", (evt) => {
         game.settings.set("dice-with-mice", "hideTracker", !hideTrackerSetting).then(() => playerList.render());
