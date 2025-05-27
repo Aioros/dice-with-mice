@@ -6,7 +6,7 @@ export const methods = {
     dice3d: {
         activateListeners() {
             // Add some necessary listeners if not already there because of a DSN setting
-            if (!game.settings.get("dice-so-nice", "allowInteractivity")) {
+            //if (!game.settings.get("dice-so-nice", "allowInteractivity")) {
                 const mouseNDC = (event) => {
                     let rect = this.canvas[0].getBoundingClientRect();
                     let x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -20,17 +20,21 @@ export const methods = {
                     await this.box.onMouseMove(event, mouseNDC(event));
                 });
                 $(document).on("mousedown.dicesonice", "body", async (event) => {
-                    await this.box.onMouseDown(event, mouseNDC(event));
-                    this._beforeShow();
+                    if (event.button === 2) {
+                        this.box.currentResolver.reset();
+                    } else {
+                        await this.box.onMouseDown(event, mouseNDC(event));
+                        this._beforeShow();
+                    }
                 });
                 $(document).on("mouseup.dicesonice", "body", async (event) => {
                     await this.box.onMouseUp(event);
                 });
-            }
+            //}
         },
 
         deactivateListeners() {
-            if (!game.settings.get("dice-so-nice", "allowInteractivity")) {
+            //if (!game.settings.get("dice-so-nice", "allowInteractivity")) {
                 const hideCanvasAndClear = () => {
                     const config = game.dice3d.constructor.CONFIG();
                     if (!config.hideAfterRoll && this.canvas.is(":visible") && !this.box.rolling) {
@@ -42,7 +46,7 @@ export const methods = {
                 $(document).on("mousedown.dicesonice", "body", async (event) => {
                     hideCanvasAndClear();
                 });    
-            }
+            //}
         },
 
         async preRoll(roll, callback) {
@@ -153,7 +157,7 @@ export const methods = {
                     if (allRerolledDiceId.length > i) { // This covers the d100 situation, each die only replaces one of the originals
                         options.replace = allRerolledDiceId[i];
                     }
-                    const dieData = { options, type: notationVectors.dice[i].type };
+                    const dieData = { options: JSON.stringify(options), type: notationVectors.dice[i].type }; // We pre-stringify the options to make it easier on the tracker's template side
                     const payload = {
                         user: game.user.id,
                         dice: {[dieId]: dieData},

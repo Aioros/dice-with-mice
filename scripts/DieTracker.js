@@ -70,7 +70,7 @@ export class DieTracker extends HTMLElement {
         box.camera.position.z = box.cameraHeight.far;
         box.camera.position.x = box.display.containerWidth / 2 - (box.display.containerWidth / 2);
         box.camera.position.y = -box.display.containerHeight / 2 + (box.display.containerHeight / 2);
-        box.camera.fov = 4 * 2 * Math.atan(box.display.containerHeight / (2 * box.camera.position.z)) * (180 / Math.PI);
+        box.camera.fov = (300 / box.display.containerWidth) * 2 * Math.atan(box.display.containerHeight / (2 * box.camera.position.z)) * (180 / Math.PI);
         
         // We rotate the camera slightly. I prefer a perfect top view, but a d4 is very hard to read like that
         box.camera.position.applyAxisAngle(new Vector3(1, 0, 0), Math.PI / 10);

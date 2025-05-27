@@ -38,7 +38,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
     static DEFAULT_OPTIONS = {
         id: "dwm-resolver-{id}",
         tag: "form",
-        classes: ["roll-resolver"],
+        classes: ["dwm-roll-resolver"],
         window: {
             title: "DICE.DWMResolverRollResolution",
         },
@@ -81,6 +81,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
     }
 
     throwerState;
+    #submitting;
 
     get broadcastTargets() {
         let broadcastTargets;
@@ -117,10 +118,9 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         return [...this.element.querySelectorAll(selector)].filter(input => input.value === "");
     }
 
-    async setThrowerState(newState) { // probably doesn't need to be async anymore, check the awaits after
+    async setThrowerState(newState) {
         this.throwerState = newState;
-        // something here to enable/disable roll buttons and similar
-        //await this.render();
+        await this.render();
     }
 
     async spawnDice(term) {
@@ -201,43 +201,50 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
     }
 
     async close(options={}) {
-        if (this.throwingDice?.length) {
-            // We are just canceling the roll
-            await this.reset();
-        } else {
+        if (this.#submitting) {
             // All done, run effects and aftershow
             game.dice3d.box.diceList = [...game.dice3d.box.deadDiceList];
             game.dice3d.box.deadDiceList = [];
             game.dice3d.box.assignSpecialEffects();
-            game.dice3d.box.handleSpecialEffectsInit().then(() => {
-                game.dice3d._afterShow();
-            });
+            game.dice3d.box.handleSpecialEffectsInit().then(() => game.dice3d._afterShow());
+            
             const results = game.dice3d.box.diceList.map(d => ({id: d.id, result: d.result}));
-            game.socket.emit("module.dice-with-mice", { type: "rollCompleted", payload: { user: game.user.id, results, broadcastTargets: this.broadcastTargets }});
+            game.socket.emit("module.dice-with-mice", { type: "rollCompleted", payload: { user: game.user.id, results, broadcastTargets: this.broadcastTargets } });
+        } else {
+            await this.reset();
         }
 
         return super.close(options);
     }
 
     async _onSubmitForm(formConfig, event) {
+        this.#submitting = true;
         DWMResolver._physicsWorker.off("worldAsleep");
         return super._onSubmitForm(formConfig, event);
     }
 
     async reset() {
+        this.throwingDice = [];
+        game.socket.emit("module.dice-with-mice", { type: "rollCanceled", payload: { user: game.user.id, broadcastTargets: this.broadcastTargets } });
         DWMResolver._physicsWorker.off("worldAsleep");
         game.dice3d.deactivateListeners();
         await game.dice3d.box.clearAll();
         await this.setThrowerState(DWMResolver.DWM_RESOLVER_STATES.INACTIVE);
+        if (canvas.mouseInteractionManager) {
+            canvas.mouseInteractionManager.activate();
+        }
     }
 
     async resolveResult(term, method, { reroll=false, explode=false }={}) {
-        this.element.querySelectorAll(`input[name="${term._id}"]:disabled`).forEach((input, i) => {
-            term.results[i].dsnDiceId = JSON.parse(input.dataset.dsnDiceId ?? "[]");
-        });
-        //if (reroll) { // Why did I have this?
-            this.spawnDice(term);
-        //}
+        console.log("resolveResult", term, method, reroll, explode);
+        if (method === DWMResolver.METHOD) {
+            this.element.querySelectorAll(`input[name="${term._id}"]:disabled`).forEach((input, i) => {
+                term.results[i].dsnDiceId = JSON.parse(input.dataset.dsnDiceId ?? "[]");
+            });
+            if (reroll || explode) {
+                this.spawnDice(term);
+            }
+        }
         return super.resolveResult(term, method, { reroll, explode });
     }
 

@@ -1,22 +1,61 @@
-fieldset.dwm-results {
-    display: flex;
-    gap: 8px;
+.dwm-roll-resolver {
+
+    /*& .form-footer {
+        display: none;
+    }*/
+
+    /*& fieldset.dwm-results {
+        display: flex;
+        gap: 8px;
+    }*/
+
+    & fieldset[data-method="dwmResolver"] {
+        display: none;
+    }
+
 }
 
-.dwm-result {
-    width: 80px;
-    height: 80px;
-    border: 1px solid #aaa;
-    border-radius: 8px;
-    position: relative;
+.dwm-tracker {
+    & .window-content {
+        padding: 0.5rem;
 
-    &.rerolled::before {
-        display: block;
-        font-family: "Font Awesome 6 Pro";
-        font-weight: 900;
-        content: "\f01e";
-        position: absolute;
-        right: 0;
-        margin: 4px;
+        & fieldset.dwm-results {
+            display: flex;
+            /*gap: 8px;*/
+            padding: 0 0.625em 0;
+            margin: 0;
+
+            & .dwm-result {
+                width: 60px;
+                height: 60px;
+                /*border: 1px solid #aaa;
+                border-radius: 8px;*/
+                position: relative;
+
+                &.rerolled::before {
+                    display: block;
+                    font-family: "Font Awesome 6 Pro";
+                    font-weight: 900;
+                    content: "\f01e";
+                    position: absolute;
+                    right: 0;
+                    margin: 4px;
+                }
+            }
+        }
+    }
+}
+
+#toggleDWMTracker {
+    width: 30px;
+    position: absolute;
+    right: 4px;
+    cursor: pointer;
+
+    &.showing {
+        opacity: 1;
+    }
+    &.hiding {
+        opacity: 0.3;
     }
 }
