@@ -2,10 +2,18 @@ export const MODULE_NAME = "dice-with-mice";
 
 export function registerSettings() {
     game.settings.register(MODULE_NAME, "hideTracker", {
-        name: "Hide Roll Tracker",
-        hint: "Don't display the roll tracker when other players are rolling their dice. This can also be changed with a button in the Player List",
+        name: "DWM.SETTINGS.HideTracker.Name",
+        hint: "DWM.SETTINGS.HideTracker.Hint",
         scope: "client",
         config: true,
+        type: Boolean,
+        default: false,
+    });
+
+    game.settings.register(MODULE_NAME, "disableDiceConfigNotification", {
+        name: "Disable DiceConfig Notification",
+        scope: "client",
+        config: false,
         type: Boolean,
         default: false,
     });

@@ -6,7 +6,18 @@
             "DWMResolver.StartRoll": "Start Roll",
             "DWMTracker.AppTitle": "Roll Tracker",
             "PlayerListToggleTooltip.Show": "Show Dice Tracker",
-            "PlayerListToggleTooltip.Hide": "Hide Dice Tracker"
+            "PlayerListToggleTooltip.Hide": "Hide Dice Tracker",
+            "DiceConfig.AssignAllLabel": "Assign All to Dice With Mice",
+            "DiceConfig.AssignAllButton": "Assign All"
+        },
+        "SETTINGS": {
+            "HideTracker.Name": "Hide Roll Tracker",
+            "HideTracker.Hint": "Don't display the roll tracker when other players are rolling their dice. This can also be changed with a button in the Player List"
+        },
+        "MESSAGES": {
+            "DiceConfigInfo": "Dice With Mice is enabled, but you don't have any dice configured to use it. You can {diceConfigLink}, or {disableNotificationLink}.",
+            "DiceConfigLinkText": "set them here",
+            "DisableNotificationText": "forever disable this notification"
         }
     }
 }

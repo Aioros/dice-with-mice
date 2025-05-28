@@ -53,3 +53,7 @@
         opacity: 0.3;
     }
 }
+
+#dice-config .dwm-assign-all button {
+    flex: 1;
+}
