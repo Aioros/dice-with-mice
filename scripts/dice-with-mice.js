@@ -6,6 +6,8 @@ import { registerSettings } from "./settings.js";
 
 customElements.define("dwm-die-tracker", DieTracker);
 
+let tracker;
+
 Hooks.on("init", () => {
     registerSettings();
     
@@ -16,7 +18,7 @@ Hooks.on("init", () => {
         resolver: DWMResolver
     };
 
-    const tracker = new DWMTracker();
+    tracker = new DWMTracker();
     tracker.listen();
 });
 
@@ -34,6 +36,12 @@ Hooks.on("diceSoNiceReady", (dice3d) => {
 Hooks.on("diceSoNiceMessageProcessed", (chatMessageId, interception) => {
     // Prevent DSN interception of chat messages entirely
     interception.willTrigger3DRoll = false;
+});
+
+Hooks.on("userConnected", (user, connected) => {
+    if (!connected && tracker.rendered) {
+        tracker.cancelRoll({user: user.id});
+    }
 });
 
 ["renderPlayerList", "renderPlayers"].forEach(hookName => {

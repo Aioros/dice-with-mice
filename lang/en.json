@@ -1,9 +1,12 @@
 {
     "DWM": {
         "FULFILLMENT.ResolverName": "Dice With Mice!",
-        "APPLICATION.DWMResolver.AppTitle": "Roll your Dice",
-        "APPLICATION.DWMTracker.AppTitle": "Roll Tracker",
-        "APPLICATION.PlayerListToggleTooltip.Show": "Show Dice Tracker",
-        "APPLICATION.PlayerListToggleTooltip.Hide": "Hide Dice Tracker"
+        "APPLICATION": {
+            "DWMResolver.AppTitle": "Roll your Dice",
+            "DWMResolver.StartRoll": "Start Roll",
+            "DWMTracker.AppTitle": "Roll Tracker",
+            "PlayerListToggleTooltip.Show": "Show Dice Tracker",
+            "PlayerListToggleTooltip.Hide": "Hide Dice Tracker"
+        }
     }
 }

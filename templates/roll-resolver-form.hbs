@@ -16,7 +16,7 @@
         {{/each}}
     </fieldset>
     {{/each}}
-    <footer class="form-footer">
+    <footer class="form-footer{{#if allThrowable}} hidden{{/if}}">
         <button type="submit">
             <i class="fas fa-check"></i>
             {{ localize "DICE.SubmitRollPl" }}

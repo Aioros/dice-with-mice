@@ -82,6 +82,8 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
             g.method = g.results[0].method;
         });
 
+        context.allThrowable = Object.values(context.groups).every(group => group.method === DWMResolver.METHOD);
+
         return context;
     }
 
