@@ -58,9 +58,13 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
     };
 
     static PARTS = {
+        header: {
+            id: "header",
+            template: "modules/dice-with-mice/templates/roll-resolver-header.hbs"
+        },
         form: {
             id: "form",
-            template: "modules/dice-with-mice/templates/roll-resolver.hbs"
+            template: "modules/dice-with-mice/templates/roll-resolver-form.hbs"
         }
     };
 
@@ -145,7 +149,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
 
     async setThrowerState(newState) {
         this.throwerState = newState;
-        await this.render();
+        await this.render({ parts: ["header"] });
     }
 
     async spawnDice(term) {
