@@ -1,0 +1,45 @@
+on:
+  push:
+    branches:
+      - develop
+
+name: Create Development Release
+
+jobs:
+  build:
+    name: Create Development Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get the version
+        id: get_version
+        run: echo "FULLVERSION=`git describe`" >> "$GITHUB_OUTPUT"
+      - id: set_vars
+        run: |
+          FULLVERSION=${{ steps.get_version.outputs.FULLVERSION }}
+          echo "ZIPURL=${{ github.server_url }}/${{ github.repository }}/releases/download/${FULLVERSION}/dice-with-mice-${FULLVERSION}.zip" >> "$GITHUB_OUTPUT"
+          echo "MODULEJSONURL=${{ github.server_url }}/${{ github.repository }}/releases/download/${FULLVERSION}/module.json" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${FULLVERSION#v}" >> $GITHUB_OUTPUT
+      - name: Update module.json
+        uses: restackio/update-json-file-action@2.1
+        with:
+          file: module.json
+          fields: "{\"version\": \"${{ steps.set_vars.outputs.VERSION }}\", \"download\": \"${{ steps.set_vars.outputs.ZIPURL }}\", \"manifest\": \"${{ steps.set_vars.outputs.MODULEJSONURL }}\"}"
+      - name: Build Project
+        run: zip dice-with-mice-${{ steps.get_version.outputs.FULLVERSION }}.zip module.json LICENSE.md README.md scripts/* styles/* templates/* lib/* lang/*
+      - name: Create Release And Upload Asset
+        id: create-release-upload
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          target_commitish: develop
+          tag_name: ${{ steps.get_version.outputs.FULLVERSION }}
+          name: ${{ steps.get_version.outputs.FULLVERSION }}
+          files: |
+            dice-with-mice-${{ steps.get_version.outputs.FULLVERSION }}.zip
+            module.json
+  
