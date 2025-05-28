@@ -36,7 +36,7 @@
         }
     ],
     "socket": true,
-    "url": "",
-    "manifest": "",
-    "download": ""
+    "url": "https://github.com/Aioros/dice-with-mice",
+    "manifest": "https://raw.githubusercontent.com/Aioros/dice-with-mice/master/module.json",
+    "download": "https://github.com/Aioros/dice-with-mice/releases/download/v0.1.0/dice-with-mice-v0.1.0.zip"
 }
