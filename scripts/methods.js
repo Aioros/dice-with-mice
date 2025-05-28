@@ -1,4 +1,6 @@
 import { DiceNotation as DWMDiceNotation } from "../lib/DSN/DiceNotation.js";
+import { MODULE_NAME } from "./settings.js";
+import { libWrapper } from "../../touch-vtt/src/utils/libWrapper.js";
 
 let broadcastInterval;
 
@@ -77,22 +79,22 @@ export const methods = {
         /**
          * @override
          */
-        async onMouseDown(event, ndc) {
+        async onMouseDown(originalOnMouseDown, event, ndc) {
             if (!!this.currentResolver?.throwerState) return true;
-            return this.constructor.prototype.onMouseDown.call(this, event, ndc);
+            return originalOnMouseDown.call(this, event, ndc);
         },
 
         /**
          * @override
          */
-        async onMouseUp(event) {
+        async onMouseUp(originalOnMouseUp, event) {
             if (this.currentResolver && this.currentResolver.throwerState === this.currentResolver.constructor.DWM_RESOLVER_STATES.READY) {
                 await this.currentResolver.setThrowerState(this.currentResolver?.constructor.DWM_RESOLVER_STATES.ROLLING);
                 await this.physicsWorker.exec("allowSleeping", true);
                 
                 this.startDiceBroadcast();
             }
-            this.constructor.prototype.onMouseUp.call(this, event);
+            originalOnMouseUp.call(this, event);
             return false;
         },
 
@@ -269,10 +271,22 @@ export const methods = {
 export function addMethods(dice3d) {
 
     Object.keys(methods.dice3d).forEach(key => {
-        dice3d[key] = methods.dice3d[key].bind(dice3d);
+        if (!dice3d[key]) {
+            console.log("adding " + key + " to dice3d");
+            dice3d.constructor.prototype[key] = methods.dice3d[key];
+        } else {
+            console.log("wrapping " + key + " for dice3d");
+            libWrapper.register(MODULE_NAME, `game.dice3d.constructor.prototype.${key}`, methods.dice3d[key], "WRAPPER");
+        }
     });
     Object.keys(methods.diceBox).forEach(key => {
-        dice3d.box[key] = methods.diceBox[key].bind(dice3d.box);
+        if (!dice3d.box[key]) {
+            console.log("adding " + key + " to diceBox");
+            dice3d.box.constructor.prototype[key] = methods.diceBox[key];
+        } else {
+            console.log("wrapping " + key + " for diceBox");
+            libWrapper.register(MODULE_NAME, `game.dice3d.box.constructor.prototype.${key}`, methods.diceBox[key], "WRAPPER");
+        }
     });
 
 }

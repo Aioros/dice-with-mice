@@ -267,7 +267,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
     }
 
     async resolveResult(term, method, { reroll=false, explode=false }={}) {
-        console.log("resolveResult", term, method, reroll, explode);
+        //console.log("resolveResult", term, method, reroll, explode);
         if (method === DWMResolver.METHOD) {
             this.element.querySelectorAll(`input[name="${term._id}"]:disabled`).forEach((input, i) => {
                 term.results[i].dsnDiceId = JSON.parse(input.dataset.dsnDiceId ?? "[]");
