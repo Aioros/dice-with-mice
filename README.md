@@ -26,4 +26,5 @@ This module would obviously not exist at all without the monumental work of [Sim
 <sup>(but also, without just the right amount of instigation from honeybadger)</sup>
 
 ## License
-Dice With Mice is licensed under the [GNU Affero General Public License v3](https://github.com/Aioros/dice-with-mice/blob/master/LICENSE.md).
+Dice With Mice is licensed under the [GNU Affero General Public License v3](https://github.com/Aioros/dice-with-mice/blob/master/LICENSE.md).\
+The module is distributed in accordance with the [Foundry Virtual Tabletop EULA - Limited License for Package Development v11.293](https://foundryvtt.com/article/license).
