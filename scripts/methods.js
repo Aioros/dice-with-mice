@@ -272,19 +272,15 @@ export function addMethods(dice3d) {
 
     Object.keys(methods.dice3d).forEach(key => {
         if (!dice3d[key]) {
-            console.log("adding " + key + " to dice3d");
             dice3d.constructor.prototype[key] = methods.dice3d[key];
         } else {
-            console.log("wrapping " + key + " for dice3d");
             libWrapper.register(MODULE_NAME, `game.dice3d.constructor.prototype.${key}`, methods.dice3d[key], "WRAPPER");
         }
     });
     Object.keys(methods.diceBox).forEach(key => {
         if (!dice3d.box[key]) {
-            console.log("adding " + key + " to diceBox");
             dice3d.box.constructor.prototype[key] = methods.diceBox[key];
         } else {
-            console.log("wrapping " + key + " for diceBox");
             libWrapper.register(MODULE_NAME, `game.dice3d.box.constructor.prototype.${key}`, methods.diceBox[key], "WRAPPER");
         }
     });
