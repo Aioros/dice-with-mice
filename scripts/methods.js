@@ -1,6 +1,6 @@
 import { DiceNotation as DWMDiceNotation } from "../lib/DSN/DiceNotation.js";
 import { MODULE_NAME } from "./settings.js";
-import { libWrapper } from "../../touch-vtt/src/utils/libWrapper.js";
+import { libWrapper } from "../lib/libWrapper.js";
 
 let broadcastInterval;
 

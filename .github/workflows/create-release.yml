@@ -54,7 +54,7 @@ jobs:
           file: module.json
           fields: "{\"version\": \"${{ steps.set_vars.outputs.VERSION }}\", \"download\": \"${{ steps.set_vars.outputs.ZIPURL }}\"}"
       - name: Build Project
-        run: zip dice-with-mice-${{ steps.get_version.outputs.FULLVERSION }}.zip module.json LICENSE.md README.md scripts/* styles/* templates/* lib/* lang/*
+        run: zip -r dice-with-mice-${{ steps.get_version.outputs.FULLVERSION }}.zip module.json LICENSE.md README.md scripts/* styles/* templates/* lib/* lang/*
       - name: Create Release And Upload Asset
         id: create-release-upload
         uses: softprops/action-gh-release@v2
