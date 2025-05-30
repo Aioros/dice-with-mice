@@ -5,6 +5,7 @@ export class DWMTracker extends HandlebarsApplicationMixin(ApplicationV2) {
     constructor(options={}) {
         super(options);
         this.#data = {};
+        this.savePosition = foundry.utils.debounce((pos) => game.settings.set("dice-with-mice", "trackerPosition", { top: pos.top, left: pos.left }), 100);
     }
 
     /** @inheritDoc */
@@ -49,19 +50,10 @@ export class DWMTracker extends HandlebarsApplicationMixin(ApplicationV2) {
         return context;
     }
 
-    #positionSaveTimeout = null;
-    savePosition(pos) {
-        game.settings.set("dice-with-mice", "trackerPosition", { top: pos.top, left: pos.left });
-    }
-
     /** @inheritDoc */
     setPosition(position) {
         const pos = super.setPosition(position);
-        if (this.#positionSaveTimeout) {
-            clearTimeout(this.#positionSaveTimeout);
-            this.#positionSaveTimeout = null;
-        }
-        this.#positionSaveTimeout = setTimeout(() => { this.savePosition(pos); }, 1000);
+        this.savePosition(pos);
         return pos;
     }
 

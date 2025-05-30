@@ -16,6 +16,8 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
                 }
             });
         });
+
+        this.savePosition = foundry.utils.debounce((pos) => game.settings.set("dice-with-mice", "resolverPosition", { top: pos.top, left: pos.left }), 100);
     }
 
     static _physicsWorker;
@@ -87,19 +89,10 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
         return context;
     }
 
-    #positionSaveTimeout = null;
-    savePosition(pos) {
-        game.settings.set("dice-with-mice", "resolverPosition", { top: pos.top, left: pos.left });
-    }
-
     /** @inheritDoc */
     setPosition(position) {
         const pos = super.setPosition(position);
-        if (this.#positionSaveTimeout) {
-            clearTimeout(this.#positionSaveTimeout);
-            this.#positionSaveTimeout = null;
-        }
-        this.#positionSaveTimeout = setTimeout(() => { this.savePosition(pos); }, 1000);
+        this.savePosition(pos);
         return pos;
     }
 
