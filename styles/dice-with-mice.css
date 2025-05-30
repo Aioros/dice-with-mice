@@ -14,8 +14,10 @@
 
         & fieldset.dwm-results {
             display: flex;
+            flex-wrap: wrap;
             padding: 0 0.625em 0;
             margin: 0;
+            max-width: 500px;
 
             & .dwm-result {
                 width: 60px;

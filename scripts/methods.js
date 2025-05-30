@@ -128,14 +128,52 @@ export const methods = {
         },
 
         getPreThrowVectors(notationVectors) {
-            for (let i = 0; i < notationVectors.dice.length; i++) {
+            const diceAmount = notationVectors.dice.length;
+
+            // We distribute the dice randomly in a "cube" of possible positions around the center
+            const cubeSize = Math.ceil(Math.cbrt(diceAmount));
+            const diceSize = 80;
+            const indexToCoord = (index) => diceSize * (index - (cubeSize-1)/2);
+
+            const cube = [];
+            for (let x=0; x<cubeSize; x++) {
+                cube.push([]);
+                for (let y=0; y<cubeSize; y++) {
+                    cube[x].push([]);
+                    for (let z=0; z<cubeSize; z++) {
+                        cube[x][y].push({x: indexToCoord(x), y: indexToCoord(y), z: 200 + z * diceSize, occupied: false});
+                    }
+                }
+            }
+            for (let i = 0; i < diceAmount; i++) {
+                let position = null;
+                while (!position) {
+                    const x = Math.floor(Math.random() * cubeSize);
+                    const y = Math.floor(Math.random() * cubeSize);
+                    const z = Math.floor(Math.random() * cubeSize);
+                    if (!cube[x][y][z].occupied) {
+                        position = cube[x][y][z];
+                        cube[x][y][z].occupied = true;
+                    }
+                }
+
                 const diceobj = this.dicefactory.get(notationVectors.dice[i].type);
                 notationVectors.dice[i].vectors = {
                     type: diceobj.type,
-                    pos: {x: 0 + 50*i, y: this.display.containerHeight * -0.9 + 50*i, z: 200},
+                    pos: position,
                     velocity: {x: 0, y: 0, z: 0},
-                    angle: {x: 0.1, y: 0.1, z: 0.1},
-                    axis: {x: 0, y: 0, z: 0, a: 0}
+                    angle: {
+                        x: Math.random(),
+                        y: Math.random(),
+                        z: Math.random()
+                    },
+                    axis: {
+                        x: Math.random(),
+                        y: Math.random(),
+                        z: Math.random(),
+                        a: Math.random()
+                    }
+
                 };
             }
             return notationVectors;
@@ -171,7 +209,7 @@ export const methods = {
             }
 
             for (let die of this.diceList) {
-                await this.physicsWorker.exec("addConstraint", { id: die.id, pos: {x: 5, y: this.display.containerHeight * -0.9 + 5, z: 200} }); // Slightly offset the constraint so that the die is not too static
+                await this.physicsWorker.exec("addConstraint", { id: die.id, pos: {x: 5, y: 5, z: 205 + 80 * throws.length} }); // Slightly offset the constraint so that the center die is not too static
             }
             this.mouse.constraint = true;
             this.mouse.constraintDown = true;
