@@ -2,7 +2,7 @@
     "id": "dice-with-mice",
     "title": "Dice With Mice!",
     "description": "All of Dice So Nice's 3D goodness, but you throw them yourself. With your... mice. It's ok because it rhymes.",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "compatibility": {
         "minimum": "12.331",
         "verified": "13.344"
@@ -38,5 +38,5 @@
     "socket": true,
     "url": "https://github.com/Aioros/dice-with-mice",
     "manifest": "https://raw.githubusercontent.com/Aioros/dice-with-mice/master/module.json",
-    "download": "https://github.com/Aioros/dice-with-mice/releases/download/v0.1.0/dice-with-mice-v0.1.0.zip"
+    "download": "https://github.com/Aioros/dice-with-mice/releases/download/v0.1.1/dice-with-mice-v0.1.1.zip"
 }
