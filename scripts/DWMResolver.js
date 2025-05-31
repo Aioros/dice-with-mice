@@ -249,6 +249,7 @@ export class DWMResolver extends foundry.applications.dice.RollResolver {
 
     async reset() {
         this.throwingDice = [];
+        game.dice3d.box.endDiceBroadcast();
         game.socket.emit("module.dice-with-mice", { type: "rollCanceled", payload: { user: game.user.id, broadcastTargets: this.broadcastTargets } });
         DWMResolver._physicsWorker.off("worldAsleep");
         game.dice3d.deactivateListeners();
