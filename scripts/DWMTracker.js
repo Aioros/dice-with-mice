@@ -67,13 +67,16 @@ export class DWMTracker extends HandlebarsApplicationMixin(ApplicationV2) {
 
     listen() {
         game.socket.on("module.dice-with-mice", async ({type, payload}) => {
+            console.log(type, payload);
             const target = payload.broadcastTargets.find(t => t.user === game.user.id);
             if (!target) return;
 
-            if (this.displayTracker && !this.rendered && !this.#renderQueued) {
-                this.#renderQueued = true;
-                this.#semaphore.add(this.render.bind(this), true)
-                    .then(() => { this.#renderQueued = false; });
+            if (type !== "rollCanceled") {
+                if (this.displayTracker && !this.rendered && !this.#renderQueued) {
+                    this.#renderQueued = true;
+                    this.#semaphore.add(this.render.bind(this), true)
+                        .then(() => { this.#renderQueued = false; });
+                }
             }
 
             switch (type) {
@@ -175,11 +178,11 @@ export class DWMTracker extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     removeRoll(user) {
-        const fieldset = this.element.querySelector(`fieldset[data-user-id="${user}"]`);
+        const fieldset = this.element?.querySelector(`fieldset[data-user-id="${user}"]`);
         if (fieldset) {
             fieldset.remove();
         }
-        if (this.element.querySelectorAll("fieldset[data-user-id]").length === 0) {
+        if (this.element?.querySelectorAll("fieldset[data-user-id]").length === 0) {
             this.close();
         }
     }
